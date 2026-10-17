@@ -2,6 +2,7 @@
 
 > [!IMPORTANT]
 > **Regla para agentes (obligatoria):**
+> - Cada feature debe de ser implementada en una rama de git nueva con el nombre de la feature
 > - Cada tarea es un checkbox `- [ ]` (pendiente).
 > - Al terminar de implementar una tarea, **cambia su marca a `- [X]`** en este mismo archivo, en el mismo cambio que la implementa.
 > - Solo márcala `[X]` si el código está hecho **y verificado** (tests pasando o comprobación manual documentada). Si queda a medias, déjala `[ ]` y anota el avance al lado.
