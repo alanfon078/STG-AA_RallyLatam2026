@@ -1,0 +1,45 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace "mx.edu.itsur.stgaa.mobile"
+    compileSdkVersion 34
+
+    defaultConfig {
+        applicationId "mx.edu.itsur.stgaa.mobile"
+        minSdkVersion 23
+        targetSdkVersion 34
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties.getProperty("keyAlias", "stgaa_tactical_key")
+            keyPassword keystoreProperties.getProperty("keyPassword", "stgaa_field_2026")
+            storeFile keystoreProperties.getProperty("storeFile") ? file(keystoreProperties.getProperty("storeFile")) : file("stgaa-release.jks")
+            storePassword keystoreProperties.getProperty("storePassword", "stgaa_field_2026")
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release.storeFile.exists() ? signingConfigs.release : signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+
+flutter {
+    source "../.."
+}

@@ -59,23 +59,24 @@ Prioridad: **P0** bloqueante / demo · **P1** necesario para producto · **P2** 
 
 ## 4. App móvil para brigadistas (Flutter) — P1
 
-- [ ] Crear proyecto Flutter (`mobile/`) con arquitectura *Feature-First* y tema oscuro nativo **OLED Black (`#000000`)** para ahorro de batería
-- [ ] Configurar persistencia local reactiva *offline-first* en SQLite (`drift` / `sqflite`) con identificadores únicos compactos
-- [ ] `lib/services/ble_service.dart`: cliente BLE (`flutter_blue_plus`) con escaneo, emparejamiento, reconexión automática permanente y cola de transmisión hacia el nodo portátil
-- [ ] Servicio GATT BLE en el firmware del nodo portátil (`[env:portable]`): recibir tramas por BLE desde el smartphone, empaquetarlas y transmitirlas por LoRa (con Wi-Fi deshabilitado para cumplir `< 0.5 W`)
-- [ ] `lib/features/formularios_sci/`:
-  - [ ] **SCI-201:** resumen del incidente, asunción de mando, polígono/perímetro de seguridad y georreferenciación de instalaciones (`PC`, `E`, `ACV`, `B`, `C`, `H1`)
-  - [ ] **SCI-211:** registro y check-in de recursos por Clase, Tipo (1 a 4), Categoría y cambio de estado (*Disponible*, *Asignado*, *No Disponible*)
-- [ ] `lib/features/triaje/`:
-  - [ ] **SCI-207:** módulo de registro táctico de víctimas en el ACV por código de colores **START** (conteo y fichas de Rojo, Amarillo, Verde, Negro)
-- [ ] Módulo de reporte rápido de **bloqueos viales** y peligros en ruta georreferenciados
-- [ ] Flujo UX de **máximo 3 toques** para acciones críticas, botones grandes ($\ge 60 \times 60\text{ dp}$) para uso con guantes y dictado por voz offline
-- [ ] Cartografía vectorial offline (MBTiles / PMTiles locales) con visualización de clústeres, instalaciones SCI y bloqueos cercanos
-- [ ] Recepción de órdenes de despacho y alertas desde el Puesto de Comando vía LoRa $\rightarrow$ BLE (enlace descendente / *downlink*)
-- [ ] Cola local de reintento y confirmación de entrega (ACK) con indicador visual de estado de sincronización
-- [ ] Transferencia de mando digital cara a cara mediante código QR o proximidad BLE (CU-G05)
-- [ ] Alerta de alcance de control (3–7 subordinados, óptimo 5, CU-G03) en app y dashboard
-- [ ] Configuración de permisos en Android/iOS (BLE, ubicación en primer plano, almacenamiento) y generación de APK firmado para despliegue sin tienda
+- [X] Crear proyecto Flutter (`mobile/`) con arquitectura *Feature-First* y tema oscuro nativo **OLED Black (`#000000`)** para ahorro de batería
+- [X] Configurar persistencia local reactiva *offline-first* en SQLite (`drift` / `sqflite`) con identificadores únicos compactos
+- [X] `lib/services/ble_service.dart`: cliente BLE (`flutter_blue_plus`) con escaneo, emparejamiento, reconexión automática permanente y cola de transmisión hacia el nodo portátil
+- [X] Servicio GATT BLE en el firmware del nodo portátil (`[env:portable]`): recibir tramas por BLE desde el smartphone, empaquetarlas y transmitirlas por LoRa (con Wi-Fi deshabilitado para cumplir `< 0.5 W`)
+- [X] `lib/features/formularios_sci/`:
+  - [X] **SCI-201:** resumen del incidente, asunción de mando, polígono/perímetro de seguridad y georreferenciación de instalaciones (`PC`, `E`, `ACV`, `B`, `C`, `H1`)
+  - [X] **SCI-211:** registro y check-in de recursos por Clase, Tipo (1 a 4), Categoría y cambio de estado (*Disponible*, *Asignado*, *No Disponible*)
+- [X] `lib/features/triaje/`:
+  - [X] **SCI-207:** módulo de registro táctico de víctimas en el ACV por código de colores **START** (conteo y fichas de Rojo, Amarillo, Verde, Negro)
+- [X] Módulo de reporte rápido de **bloqueos viales** y peligros en ruta georreferenciados
+- [X] Flujo UX de **máximo 3 toques** para acciones críticas, botones grandes ($\ge 60 \times 60\text{ dp}$) para uso con guantes y dictado por voz offline
+- [X] Cartografía vectorial offline (MBTiles / PMTiles locales) con visualización de clústeres, instalaciones SCI y bloqueos cercanos
+- [X] Recepción de órdenes de despacho y alertas desde el Puesto de Comando vía LoRa $\rightarrow$ BLE (enlace descendente / *downlink*)
+- [X] Cola local de reintento y confirmación de entrega (ACK) con indicador visual de estado de sincronización
+- [X] Transferencia de mando digital cara a cara mediante código QR o proximidad BLE (CU-G05)
+- [X] Alerta de alcance de control (3–7 subordinados, óptimo 5, CU-G03) en app y dashboard
+- [X] Configuración de permisos en Android/iOS (BLE, ubicación en primer plano, almacenamiento) y generación de APK firmado para despliegue sin tienda
+
 
 ## 5. Seguridad — P0/P1
 

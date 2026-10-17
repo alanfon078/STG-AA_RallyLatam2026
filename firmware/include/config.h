@@ -40,4 +40,12 @@ constexpr float kTcxoVolts = 1.8f;
 constexpr uint8_t kDefaultTtl = 3;
 constexpr const char* kApSsid = "SOS_MUNICIPIO";
 
+namespace ble {
+constexpr const char* kDeviceNamePrefix = "STG-AA-NODO-";
+constexpr const char* kServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+constexpr const char* kRxCharacteristicUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+constexpr const char* kTxCharacteristicUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+}  // namespace ble
+
 }  // namespace stg
+

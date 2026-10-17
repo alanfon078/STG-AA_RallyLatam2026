@@ -6,6 +6,8 @@
 
 #if defined(ROLE_NODE)
 #include "portal.h"
+#elif defined(ROLE_PORTABLE)
+#include "ble_bridge.h"
 #endif
 
 namespace {
@@ -45,7 +47,7 @@ void printFrame(const stg::Frame& frame) {
 }
 #endif
 
-#if defined(ROLE_NODE)
+#if defined(ROLE_NODE) || defined(ROLE_PORTABLE)
 void relay(stg::Frame frame) {
     if (frame.ttl == 0) return;
     --frame.ttl;
@@ -68,6 +70,9 @@ void setup() {
 #if defined(ROLE_NODE)
     stg::portal::begin();
     Serial.println("OK nodo");
+#elif defined(ROLE_PORTABLE)
+    stg::ble_bridge::begin();
+    Serial.println("OK portable BLE");
 #else
     Serial.println("OK gateway");
 #endif
@@ -78,6 +83,9 @@ void loop() {
     if (stg::radio::poll(incoming) && !markSeen(incoming)) {
 #if defined(ROLE_GATEWAY)
         printFrame(incoming);
+#elif defined(ROLE_PORTABLE)
+        stg::ble_bridge::notifyDownlink(incoming);
+        relay(incoming);
 #else
         relay(incoming);
 #endif
@@ -90,5 +98,14 @@ void loop() {
         markSeen(outgoing);
         stg::radio::send(outgoing);
     }
+#elif defined(ROLE_PORTABLE)
+    stg::Frame outgoing;
+    while (stg::ble_bridge::takePending(outgoing)) {
+        markSeen(outgoing);
+        if (stg::radio::send(outgoing)) {
+            stg::ble_bridge::notifyAck(outgoing);
+        }
+    }
 #endif
 }
+
