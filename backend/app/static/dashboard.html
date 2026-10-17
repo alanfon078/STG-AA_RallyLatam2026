@@ -6,177 +6,43 @@
   <title>STG-AA — Dashboard del Puesto de Comando</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root {
-      --bg: #f6f6f3;
-      --surface: #ffffff;
-      --ink: #111111;
-      --muted: #666660;
-      --line: #e2e2dc;
-      --critical: #b91c1c;
-      --critical-bg: #fef2f2;
-      --warning: #92400e;
-      --warning-bg: #fffbeb;
-      --dispatched: #166534;
-      --dispatched-bg: #f0fdf4;
-      --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
-      --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: var(--sans);
-      font-size: 13px;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    header {
-      height: 50px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 20px;
-      flex-shrink: 0;
-    }
-    .brand { display: flex; align-items: baseline; gap: 12px; }
-    .brand h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
-    .brand span { color: var(--muted); font-size: 12px; }
-    .meta {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .dot {
-      display: inline-block;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #16a34a;
-      margin-right: 5px;
-    }
-    .workspace {
-      display: grid;
-      grid-template-columns: 1fr 460px;
-      flex: 1;
-      min-height: 0;
-    }
-    @media (max-width: 960px) {
-      body { height: auto; overflow: auto; }
-      .workspace { grid-template-columns: 1fr; }
-      #map { height: 420px; }
-    }
-    #map { width: 100%; height: 100%; background: #eaeae4; }
-    .leaflet-tile-pane { filter: grayscale(0.82) contrast(1.04); }
-    .panel {
-      background: var(--surface);
-      border-left: 1px solid var(--line);
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .kpis {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-bottom: 1px solid var(--line);
-    }
-    .kpi { padding: 14px 16px; border-right: 1px solid var(--line); }
-    .kpi:last-child { border-right: 0; }
-    .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .kpi-val { font-family: var(--mono); font-size: 22px; font-weight: 600; margin-top: 4px; }
-    .panel-bar {
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--bg);
-    }
-    .panel-bar span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-    .filters { display: flex; gap: 4px; }
-    .filter-btn {
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      font-size: 11px;
-      padding: 4px 8px;
-      cursor: pointer;
-      border-radius: 3px;
-    }
-    .filter-btn.active {
-      background: var(--surface);
-      color: var(--ink);
-      border-color: var(--line);
-      font-weight: 600;
-    }
-    .list { flex: 1; overflow-y: auto; }
-    .item {
-      padding: 16px;
-      border-bottom: 1px solid var(--line);
-      cursor: pointer;
-      transition: background 0.12s;
-    }
-    .item:hover { background: #fafaf8; }
-    .item-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-    .zone-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-    .coords { font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 400; }
-    .score { font-family: var(--mono); font-size: 18px; font-weight: 600; }
-    .tag {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 2px;
-      text-transform: uppercase;
-    }
-    .tag.critical { color: var(--critical); background: var(--critical-bg); }
-    .tag.warning { color: var(--warning); background: var(--warning-bg); }
-    .tag.dispatched { color: var(--dispatched); background: var(--dispatched-bg); }
-    .metrics { color: var(--muted); font-size: 12px; margin: 8px 0 12px; }
-    .item-foot { display: flex; justify-content: space-between; align-items: center; }
-    .recommendation { font-size: 12px; color: var(--ink); }
-    .btn-dispatch {
-      border: 1px solid var(--ink);
-      background: var(--ink);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 5px 10px;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-    .btn-dispatch.done {
-      background: var(--surface);
-      color: var(--dispatched);
-      border-color: #bbf7d0;
-    }
-    footer {
-      padding: 10px 16px;
-      border-top: 1px solid var(--line);
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      background: var(--bg);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    :root { --bg:#f6f6f3; --surface:#fff; --ink:#111; --muted:#666660; --line:#e2e2dc; --crit:#b91c1c; --warn:#92400e; --ok:#166534; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+    header { height:50px; background:var(--surface); border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; padding:0 20px; }
+    header h1 { margin:0; font-size:14px; display:inline; margin-right:10px; }
+    .meta { font:11px monospace; color:var(--muted); display:flex; gap:16px; align-items:center; }
+    .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#16a34a; margin-right:5px; }
+    .workspace { display:grid; grid-template-columns:1fr 460px; flex:1; min-height:0; }
+    #map { width:100%; height:100%; background:#eaeae4; }
+    .leaflet-tile-pane { filter:grayscale(0.82) contrast(1.04); }
+    .panel { background:var(--surface); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+    .kpis { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid var(--line); }
+    .kpi { padding:12px 16px; border-right:1px solid var(--line); }
+    .kpi-label { font-size:11px; color:var(--muted); text-transform:uppercase; }
+    .kpi-val { font:600 22px monospace; margin-top:4px; }
+    .panel-bar { padding:9px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; background:var(--bg); font-size:11px; font-weight:600; text-transform:uppercase; color:var(--muted); }
+    .filter-btn { border:1px solid transparent; background:transparent; color:var(--muted); font-size:11px; padding:3px 8px; cursor:pointer; border-radius:3px; }
+    .filter-btn.active { background:var(--surface); color:var(--ink); border-color:var(--line); font-weight:600; }
+    .list { flex:1; overflow-y:auto; }
+    .item { padding:14px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+    .item:hover { background:#fafaf8; }
+    .row { display:flex; justify-content:space-between; align-items: center; }
+    .tag { font:600 10px monospace; padding:2px 6px; border-radius:2px; text-transform:uppercase; }
+    .tag.critical { color:var(--crit); background:#fef2f2; }
+    .tag.warning { color:var(--warn); background:#fffbeb; }
+    .tag.dispatched { color:var(--ok); background:#f0fdf4; }
+    .metrics { color:var(--muted); font-size:12px; margin:6px 0 10px; }
+    .btn-dispatch { border:1px solid var(--ink); background:var(--ink); color:#fff; font-size:11px; padding:5px 10px; border-radius:3px; cursor:pointer; }
+    .btn-dispatch.done { background:var(--surface); color:var(--ok); border-color:#bbf7d0; }
+    footer { padding:10px 16px; border-top:1px solid var(--line); font:11px monospace; color:var(--muted); background:var(--bg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   </style>
 </head>
 <body>
-
   <header>
-    <div class="brand">
+    <div>
       <h1>STG-AA · Dashboard del Puesto de Comando</h1>
-      <span>Sistema de Triaje Georreferenciado y Asignación Algorítmica</span>
+      <span style="color:var(--muted);font-size:12px">Sistema de Triaje Georreferenciado y Asignación Algorítmica</span>
     </div>
     <div class="meta">
       <span><i class="dot"></i>ENLACE LORA 915 MHZ ACTIVO</span>
@@ -186,38 +52,27 @@
 
   <div class="workspace">
     <div id="map"></div>
-
     <aside class="panel">
       <div class="kpis">
-        <div class="kpi">
-          <div class="kpi-label">Zonas activas</div>
-          <div class="kpi-val" id="kpi-clusters">0</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Confirmadas SCI</div>
-          <div class="kpi-val" id="kpi-verified">0</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Reportes totales</div>
-          <div class="kpi-val" id="kpi-reports">0</div>
-        </div>
+        <div class="kpi"><div class="kpi-label">Zonas activas</div><div class="kpi-val" id="kpi-clusters">0</div></div>
+        <div class="kpi"><div class="kpi-label">Confirmadas SCI</div><div class="kpi-val" id="kpi-verified">0</div></div>
+        <div class="kpi"><div class="kpi-label">Reportes totales</div><div class="kpi-val" id="kpi-reports">0</div></div>
       </div>
 
       <div class="panel-bar">
         <span>Cola de prioridad operativa</span>
-        <div class="filters">
+        <div>
           <button class="filter-btn active" onclick="setFilter('all', this)">Todos</button>
           <button class="filter-btn" onclick="setFilter('verified', this)">SCI</button>
           <button class="filter-btn" onclick="setFilter('unverified', this)">Por verificar</button>
         </div>
       </div>
-
       <div class="list" id="cluster-list"></div>
 
       <div class="panel-bar" style="border-top:1px solid var(--line)">
         <span>Bitácora de Campo · Bloqueos Viales y Recursos (SCI-211)</span>
       </div>
-      <div id="field-list" style="max-height:175px;overflow-y:auto"></div>
+      <div id="field-list" style="max-height:170px;overflow-y:auto"></div>
 
       <footer id="last-frame">TRAMA LORA (25B): —</footer>
     </aside>
@@ -225,20 +80,12 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    let map = null;
-    let mapLayer = null;
-    let currentFilter = 'all';
-    let dispatchedZones = new Set();
-    let cachedClusters = [];
-    let cachedRoadblocks = [];
-    let cachedResources = [];
+    let map = null, mapLayer = null, currentFilter = 'all';
+    let dispatchedZones = new Set(), cachedClusters = [], cachedRoadblocks = [], cachedResources = [];
 
     if (typeof L !== 'undefined') {
-      map = L.map('map', { zoomControl: true }).setView([20.141, -101.179], 14);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
+      map = L.map('map').setView([20.141, -101.179], 14);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
       mapLayer = L.layerGroup().addTo(map);
     }
 
@@ -246,133 +93,84 @@
       currentFilter = filter;
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderClusters(cachedClusters);
+      render();
     }
 
     function focusZone(lat, lon) {
       if (map) map.flyTo([lat, lon], 16, { duration: 0.6 });
     }
 
-    function toggleDispatch(event, id) {
-      event.stopPropagation();
-      if (dispatchedZones.has(id)) dispatchedZones.delete(id);
-      else dispatchedZones.add(id);
-      renderClusters(cachedClusters);
+    function toggleDispatch(e, id) {
+      e.stopPropagation();
+      dispatchedZones.has(id) ? dispatchedZones.delete(id) : dispatchedZones.add(id);
+      render();
     }
 
-    function renderClusters(clusters) {
+    function render() {
       if (mapLayer) {
         mapLayer.clearLayers();
-        clusters.forEach(c => {
-          const isDispatched = dispatchedZones.has(c.id);
-          const color = isDispatched ? '#166534' : (c.verified ? '#b91c1c' : '#92400e');
-          L.circle([c.lat, c.lon], {
-            radius: 85,
-            color: color,
-            weight: 1.5,
-            fillColor: color,
-            fillOpacity: 0.18
-          })
-          .bindPopup(`<b>Zona 0${c.id}</b><br>Urgencia: ${c.urgency}<br>Reportes: ${c.citizen_count + c.verified_count}`)
-          .addTo(mapLayer);
+        cachedClusters.forEach(c => {
+          const color = dispatchedZones.has(c.id) ? '#166534' : (c.verified ? '#b91c1c' : '#92400e');
+          L.circle([c.lat, c.lon], { radius: 85, color, weight: 1.5, fillColor: color, fillOpacity: 0.18 })
+            .bindPopup(`<b>Zona 0${c.id}</b><br>Urgencia: ${c.urgency}`).addTo(mapLayer);
         });
-
         cachedRoadblocks.forEach(rb => {
-          L.circleMarker([rb.lat, rb.lon], {
-            radius: 7,
-            color: '#111111',
-            weight: 2,
-            fillColor: '#b91c1c',
-            fillOpacity: 0.95
-          })
-          .bindPopup(`<b>BLOQUEO VIAL · ${rb.street}</b><br>${rb.cause} (${rb.closure})`)
-          .addTo(mapLayer);
+          L.circleMarker([rb.lat, rb.lon], { radius: 7, color: '#111', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.95 })
+            .bindPopup(`<b>BLOQUEO VIAL · ${rb.street}</b><br>${rb.cause} (${rb.closure})`).addTo(mapLayer);
         });
       }
 
-      const filtered = clusters.filter(c => {
-        if (currentFilter === 'verified') return c.verified;
-        if (currentFilter === 'unverified') return !c.verified;
-        return true;
-      });
+      const filtered = cachedClusters.filter(c =>
+        currentFilter === 'verified' ? c.verified : (currentFilter === 'unverified' ? !c.verified : true)
+      );
 
-      const list = document.getElementById('cluster-list');
-      if (!filtered.length) {
-        list.innerHTML = '<div style="padding:24px 16px;color:var(--muted)">Sin incidentes para el filtro seleccionado.</div>';
-        return;
-      }
-
-      list.innerHTML = filtered.map(c => {
-        const isDispatched = dispatchedZones.has(c.id);
+      document.getElementById('cluster-list').innerHTML = filtered.map(c => {
+        const done = dispatchedZones.has(c.id);
         const isFT = c.recommendation === 'FUERZA_TAREA';
-        const tagClass = isDispatched ? 'dispatched' : (isFT ? 'critical' : 'warning');
-        const tagText = isDispatched ? 'UNIDAD EN CAMINO' : (isFT ? 'FUERZA DE TAREA' : 'RECONOCIMIENTO');
-        const recText = isFT
-          ? 'Despacho pesado (USAR / Ambulancia)'
-          : 'Unidad ligera de verificación (Sin confirmar)';
-
+        const tagClass = done ? 'dispatched' : (isFT ? 'critical' : 'warning');
+        const tagText = done ? 'UNIDAD EN CAMINO' : (isFT ? 'FUERZA DE TAREA' : 'RECONOCIMIENTO');
         return `
           <div class="item" onclick="focusZone(${c.lat}, ${c.lon})">
-            <div class="item-top">
-              <div class="zone-title">
-                <span>Zona 0${c.id}</span>
-                <span class="tag ${tagClass}">${tagText}</span>
-                <span class="coords">${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</span>
-              </div>
-              <div class="score" title="Puntaje de urgencia (0-100)">U ${c.urgency}</div>
+            <div class="row">
+              <div><strong>Zona 0${c.id}</strong> <span class="tag ${tagClass}">${tagText}</span></div>
+              <strong style="font:600 17px monospace">U ${c.urgency}</strong>
             </div>
             <div class="metrics">
-              Ciudadanos: <b>${c.citizen_count}</b> &middot;
-              Dictamen SCI: <b>${c.verified_count}</b> &middot;
-              Severidad: <b>${c.severity}/10</b> &middot;
-              Afectados est.: <b>${c.affected}</b>
+              Ciudadanos: <b>${c.citizen_count}</b> &middot; Dictamen SCI: <b>${c.verified_count}</b> &middot;
+              Severidad: <b>${c.severity}/10</b> &middot; Afectados est.: <b>${c.affected}</b>
             </div>
-            <div class="item-foot">
-              <span class="recommendation">${recText}</span>
-              <button class="btn-dispatch ${isDispatched ? 'done' : ''}" onclick="toggleDispatch(event, ${c.id})">
-                ${isDispatched ? 'Unidad asignada' : 'Despachar unidad'}
+            <div class="row">
+              <span>${isFT ? 'Despacho pesado (USAR / Ambulancia)' : 'Unidad ligera de verificación'}</span>
+              <button class="btn-dispatch ${done ? 'done' : ''}" onclick="toggleDispatch(event, ${c.id})">
+                ${done ? 'Unidad asignada' : 'Despachar unidad'}
               </button>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
 
-      const fieldList = document.getElementById('field-list');
-      const rbItems = cachedRoadblocks.map(rb => `
-        <div class="item" style="padding:10px 16px" onclick="focusZone(${rb.lat}, ${rb.lon})">
-          <div class="zone-title">
-            <span class="tag critical">BLOQUEO VIAL</span>
-            <span>${rb.street}</span>
-          </div>
-          <div class="metrics" style="margin:4px 0 0">${rb.cause} &middot; <b>${rb.closure}</b></div>
-        </div>
-      `);
-      const resItems = cachedResources.map(r => `
-        <div class="item" style="padding:10px 16px">
-          <div class="zone-title">
-            <span class="tag warning">SCI-211 RECURSO</span>
-            <span>${r.resource}</span>
-          </div>
-          <div class="metrics" style="margin:4px 0 0">${r.zone} &middot; Estado: <b>${r.unit_status}</b> ${r.notes ? '&middot; ' + r.notes : ''}</div>
-        </div>
-      `);
-      fieldList.innerHTML = [...rbItems, ...resItems].join('') || '<div style="padding:12px 16px;color:var(--muted)">Sin reportes adicionales.</div>';
+      const rbHtml = cachedRoadblocks.map(rb => `
+        <div class="item" style="padding:9px 16px" onclick="focusZone(${rb.lat}, ${rb.lon})">
+          <span class="tag critical">BLOQUEO VIAL</span> <strong>${rb.street}</strong>
+          <div class="metrics" style="margin:3px 0 0">${rb.cause} &middot; <b>${rb.closure}</b></div>
+        </div>`);
+      const resHtml = cachedResources.map(r => `
+        <div class="item" style="padding:9px 16px">
+          <span class="tag warning">SCI-211</span> <strong>${r.resource}</strong>
+          <div class="metrics" style="margin:3px 0 0">${r.zone} &middot; <b>${r.unit_status}</b> ${r.notes ? '&middot; ' + r.notes : ''}</div>
+        </div>`);
+      document.getElementById('field-list').innerHTML = [...rbHtml, ...resHtml].join('');
     }
 
     async function refreshState() {
-      const res = await fetch('/demo/state');
-      const data = await res.json();
+      const data = await (await fetch('/demo/state')).json();
       cachedClusters = data.clusters || [];
       cachedRoadblocks = data.roadblocks || [];
       cachedResources = data.resources || [];
-
       document.getElementById('kpi-clusters').textContent = cachedClusters.length;
       document.getElementById('kpi-verified').textContent = cachedClusters.filter(c => c.verified).length;
       document.getElementById('kpi-reports').textContent = data.total_reports;
-      document.getElementById('last-frame').textContent =
-        'TRAMA LORA (25B): ' + (data.last_frame_hex || '—');
-
-      renderClusters(cachedClusters);
+      document.getElementById('last-frame').textContent = 'TRAMA LORA (25B): ' + (data.last_frame_hex || '—');
+      render();
     }
 
     refreshState();
