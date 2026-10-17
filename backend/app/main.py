@@ -4,8 +4,9 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
+from urllib.parse import parse_qs
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -18,6 +19,7 @@ from .service import build_clusters
 logging.basicConfig(level=logging.INFO)
 
 DASHBOARD_HTML_PATH = Path(__file__).parent / "static" / "dashboard.html"
+PORTAL_HTML_PATH = Path(__file__).resolve().parents[2] / "firmware" / "data" / "index.html"
 _seq_counter = 0
 
 
@@ -103,6 +105,35 @@ app = FastAPI(title="STG-AA Servidor Tactico (Prototipo Rally)", lifespan=lifesp
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_ui() -> str:
     return DASHBOARD_HTML_PATH.read_text(encoding="utf-8")
+
+
+@app.get("/portal", response_class=HTMLResponse)
+def portal_ui() -> str:
+    return PORTAL_HTML_PATH.read_text(encoding="utf-8")
+
+
+@app.post("/sos")
+async def portal_sos(request: Request) -> dict:
+    raw = (await request.body()).decode("utf-8")
+    params = parse_qs(raw)
+    kind = int(params.get("kind", ["0"])[0] or 0)
+    affected = max(1, min(999, int(params.get("affected", ["1"])[0] or 1)))
+    lat_raw = params.get("lat", [""])[0]
+    lon_raw = params.get("lon", [""])[0]
+    lat = float(lat_raw) if lat_raw else 20.1410
+    lon = float(lon_raw) if lon_raw else -101.1790
+    frame = Frame(
+        flags=0,
+        kind=max(0, min(4, kind)),
+        node_id=1,
+        seq=_next_seq(),
+        node_time=int(time.time()) & 0xFFFFFFFF,
+        lat=lat,
+        lon=lon,
+        affected=affected,
+    )
+    ingest_hex(frame.encode().hex())
+    return {"ok": True}
 
 
 @app.get("/health")
