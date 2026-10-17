@@ -40,8 +40,52 @@ class DemoReportIn(BaseModel):
     severity: int = Field(default=0, ge=0, le=10)
 
 
+def _seed_initial_data() -> None:
+    """Carga un escenario operativo inicial para el Puesto de Comando."""
+    if fetch_reports(settings.cluster_window_min):
+        return
+    rng = random.Random(42)
+    now = int(time.time()) & 0xFFFFFFFF
+
+    # Zona 1: Centro (12 reportes ciudadanos + 1 verificación de Brigadista SCI)
+    for _ in range(12):
+        f = Frame(
+            flags=0, kind=0, node_id=rng.randint(1, 3), seq=_next_seq(), node_time=now,
+            lat=20.1410 + rng.uniform(-0.0002, 0.0002),
+            lon=-101.1790 + rng.uniform(-0.0002, 0.0002),
+            affected=rng.randint(2, 5),
+        )
+        ingest_hex(f.encode().hex())
+    f_sci = Frame(
+        flags=FLAG_BRIGADISTA | FLAG_PRIORITY, kind=0, node_id=901, seq=_next_seq(),
+        node_time=now, lat=20.1410, lon=-101.1790, severity=9, affected=6,
+    )
+    ingest_hex(f_sci.encode().hex())
+
+    # Zona 2: Sector Sur (15 reportes ciudadanos sin verificar -> Reconocimiento)
+    for _ in range(15):
+        f = Frame(
+            flags=0, kind=2, node_id=rng.randint(2, 4), seq=_next_seq(), node_time=now,
+            lat=20.1355 + rng.uniform(-0.0002, 0.0002),
+            lon=-101.1845 + rng.uniform(-0.0002, 0.0002),
+            affected=rng.randint(1, 4),
+        )
+        ingest_hex(f.encode().hex())
+
+    # Zona 3: Sector Oriente (4 reportes ciudadanos sin verificar -> Reconocimiento)
+    for _ in range(4):
+        f = Frame(
+            flags=0, kind=1, node_id=rng.randint(3, 5), seq=_next_seq(), node_time=now,
+            lat=20.1475 + rng.uniform(-0.00015, 0.00015),
+            lon=-101.1710 + rng.uniform(-0.00015, 0.00015),
+            affected=rng.randint(1, 3),
+        )
+        ingest_hex(f.encode().hex())
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _seed_initial_data()
     reader = None
     if settings.serial_port:
         reader = SerialIngest(settings.serial_port, settings.serial_baud)
@@ -51,6 +95,7 @@ async def lifespan(_: FastAPI):
         reader.stop()
 
 
+_seed_initial_data()
 app = FastAPI(title="STG-AA Servidor Tactico (Prototipo Rally)", lifespan=lifespan)
 
 

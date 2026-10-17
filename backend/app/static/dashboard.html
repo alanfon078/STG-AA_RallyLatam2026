@@ -3,216 +3,338 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>STG-AA · Dashboard del Puesto de Comando</title>
+  <title>STG-AA — Dashboard del Puesto de Comando</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #0b0f19;
-      --panel: #131b2e;
-      --border: #26334d;
-      --red: #ff1744;
-      --yellow: #ffd600;
-      --green: #00e676;
-      --orange: #ff6d00;
+      --bg: #f6f6f3;
+      --surface: #ffffff;
+      --ink: #111111;
+      --muted: #666660;
+      --line: #e2e2dc;
+      --critical: #b91c1c;
+      --critical-bg: #fef2f2;
+      --warning: #92400e;
+      --warning-bg: #fffbeb;
+      --dispatched: #166534;
+      --dispatched-bg: #f0fdf4;
+      --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: #f1f5f9; font-family: system-ui, sans-serif; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     header {
-      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
-      gap: 10px; padding: 12px 20px; background: #070a12; border-bottom: 1px solid var(--border);
+      height: 50px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      flex-shrink: 0;
     }
-    header h1 { margin: 0; font-size: 18px; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
-    button {
-      border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 700; cursor: pointer;
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+    .brand span { color: var(--muted); font-size: 12px; }
+    .meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
     }
-    .grid {
-      display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; padding: 16px 20px; max-width: 1500px; margin: 0 auto;
+    .dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #16a34a;
+      margin-right: 5px;
     }
-    .mocks {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 20px 20px; max-width: 1500px; margin: 0 auto;
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 460px;
+      flex: 1;
+      min-height: 0;
     }
-    @media (max-width: 950px) { .grid, .mocks { grid-template-columns: 1fr; } }
-    .card {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    @media (max-width: 960px) {
+      body { height: auto; overflow: auto; }
+      .workspace { grid-template-columns: 1fr; }
+      #map { height: 420px; }
     }
-    .card h2 { margin: 0 0 10px; font-size: 16px; }
-    #map { width: 100%; height: 380px; border-radius: 8px; background: #090d16; }
-    .cluster {
-      background: #0b111e; border-left: 6px solid var(--yellow); border-radius: 8px;
-      padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+    #map { width: 100%; height: 100%; background: #eaeae4; }
+    .leaflet-tile-pane { filter: grayscale(0.82) contrast(1.04); }
+    .panel {
+      background: var(--surface);
+      border-left: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
-    .cluster.verified { border-left-color: var(--red); }
-    .badge { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 900; }
-    .hex {
-      font-family: monospace; background: #070a12; padding: 8px; border-radius: 6px;
-      color: var(--green); font-size: 13px; margin-top: 10px; word-break: break-all;
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-bottom: 1px solid var(--line);
     }
-    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; }
-    select, input { background: #0b111e; color: #fff; border: 1px solid #475569; border-radius: 6px; padding: 6px; }
+    .kpi { padding: 14px 16px; border-right: 1px solid var(--line); }
+    .kpi:last-child { border-right: 0; }
+    .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi-val { font-family: var(--mono); font-size: 22px; font-weight: 600; margin-top: 4px; }
+    .panel-bar {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg);
+    }
+    .panel-bar span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    .filters { display: flex; gap: 4px; }
+    .filter-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .filter-btn.active {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--line);
+      font-weight: 600;
+    }
+    .list { flex: 1; overflow-y: auto; }
+    .item {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .item:hover { background: #fafaf8; }
+    .item-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .zone-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    .coords { font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 400; }
+    .score { font-family: var(--mono); font-size: 18px; font-weight: 600; }
+    .tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+    .tag.critical { color: var(--critical); background: var(--critical-bg); }
+    .tag.warning { color: var(--warning); background: var(--warning-bg); }
+    .tag.dispatched { color: var(--dispatched); background: var(--dispatched-bg); }
+    .metrics { color: var(--muted); font-size: 12px; margin: 8px 0 12px; }
+    .item-foot { display: flex; justify-content: space-between; align-items: center; }
+    .recommendation { font-size: 12px; color: var(--ink); }
+    .btn-dispatch {
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .btn-dispatch.done {
+      background: var(--surface);
+      color: var(--dispatched);
+      border-color: #bbf7d0;
+    }
+    footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   </style>
 </head>
 <body>
 
   <header>
-    <div>
-      <h1>🟧 [PC] STG-AA · Dashboard del Puesto de Comando</h1>
-      <small style="color:#94a3b8">Triaje Georreferenciado y Asignación Algorítmica · Red LoRa 915 MHz</small>
+    <div class="brand">
+      <h1>STG-AA · Dashboard del Puesto de Comando</h1>
+      <span>Sistema de Triaje Georreferenciado y Asignación Algorítmica</span>
     </div>
-    <div class="toolbar">
-      <button style="background:#38bdf8;color:#000" onclick="simularRafaga()">
-        ⚡ 1. Simular 21 Alertas Ciudadanas
-      </button>
-      <button style="background:var(--orange);color:#000" onclick="enviarReporte(true, 20.140, -101.180)">
-        🩺 2. Verificar Zona A (Brigadista SCI)
-      </button>
-      <button style="background:#334155;color:#fff" onclick="reiniciar()">
-        ↺ Reiniciar
-      </button>
+    <div class="meta">
+      <span><i class="dot"></i>ENLACE LORA 915 MHZ ACTIVO</span>
+      <span>RADIO DBSCAN: 80 M</span>
     </div>
   </header>
 
-  <!-- DASHBOARD PRINCIPAL: MAPA + COLA DE PRIORIZACIÓN -->
-  <main class="grid">
-    <section class="card">
-      <h2>🗺️ Mapa Táctico de Clústeres (DBSCAN · Radio 80 m)</h2>
-      <div id="map"></div>
-    </section>
+  <div class="workspace">
+    <div id="map"></div>
 
-    <section class="card">
-      <h2>🚨 Cola Priorizada por Puntaje de Urgencia (0–100)</h2>
-      <div id="lista-clusters"></div>
-      <div class="hex" id="ultima-trama">Última trama LoRa (25B): esperando datos...</div>
-    </section>
-  </main>
+    <aside class="panel">
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">Zonas activas</div>
+          <div class="kpi-val" id="kpi-clusters">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Confirmadas SCI</div>
+          <div class="kpi-val" id="kpi-verified">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Reportes totales</div>
+          <div class="kpi-val" id="kpi-reports">0</div>
+        </div>
+      </div>
 
-  <!-- MOCKS INTERACTIVOS DE LOS 2 NIVELES DE CAPTURA -->
-  <section class="mocks">
-    <!-- Nivel 1: Portal Cautivo Ciudadano -->
-    <div class="card">
-      <h2>📱 Mock Nivel 1: Portal Cautivo Ciudadano (Wi-Fi: SOS_MUNICIPIO)</h2>
-      <div class="row">
-        <span>Tipo de emergencia:</span>
-        <select id="cit-kind">
-          <option value="0">🏚️ Derrumbe</option>
-          <option value="1">🆘 Persona atrapada</option>
-          <option value="2">🌊 Inundación</option>
-          <option value="3">🔥 Incendio</option>
-          <option value="4">🩸 Herido grave</option>
-        </select>
+      <div class="panel-bar">
+        <span>Cola de prioridad operativa</span>
+        <div class="filters">
+          <button class="filter-btn active" onclick="setFilter('all', this)">Todos</button>
+          <button class="filter-btn" onclick="setFilter('verified', this)">SCI</button>
+          <button class="filter-btn" onclick="setFilter('unverified', this)">Por verificar</button>
+        </div>
       </div>
-      <div class="row">
-        <span>Personas afectadas:</span>
-        <input type="number" id="cit-affected" value="2" min="1" max="50">
-      </div>
-      <button style="background:#e00000;color:#fff;width:100%" onclick="enviarReporte(false, 20.140, -101.180)">
-        Enviar SOS Ciudadano (Sin Internet)
-      </button>
-    </div>
 
-    <!-- Nivel 2: App Móvil Brigadista -->
-    <div class="card">
-      <h2>🩺 Mock Nivel 2: App Brigadista Offline-First (Bluetooth → LoRa)</h2>
-      <div class="row">
-        <span>Severidad Triaje START (1–10):</span>
-        <input type="number" id="brig-sev" value="9" min="1" max="10">
-      </div>
-      <div class="row">
-        <span>Víctimas confirmadas en el ACV:</span>
-        <input type="number" id="brig-affected" value="4" min="1" max="50">
-      </div>
-      <button style="background:var(--orange);color:#000;width:100%" onclick="enviarReporte(true, 20.140, -101.180)">
-        Transmitir Dictamen Verificado (FLAG_BRIGADISTA)
-      </button>
-    </div>
-  </section>
+      <div class="list" id="cluster-list"></div>
+
+      <footer id="last-frame">TRAMA LORA (25B): —</footer>
+    </aside>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     let map = null;
-    let capaMapa = null;
+    let mapLayer = null;
+    let currentFilter = 'all';
+    let dispatchedZones = new Set();
+    let cachedClusters = [];
 
     if (typeof L !== 'undefined') {
-      map = L.map('map').setView([20.146, -101.173], 14);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-      capaMapa = L.layerGroup().addTo(map);
+      map = L.map('map', { zoomControl: true }).setView([20.141, -101.179], 14);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+      mapLayer = L.layerGroup().addTo(map);
     }
 
-    async function simularRafaga() {
-      await fetch('/demo/simulate', { method: 'POST' });
-      cargarEstado();
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderClusters(cachedClusters);
     }
 
-    async function enviarReporte(verificado, lat, lon) {
-      const kind = verificado ? 4 : Number(document.getElementById('cit-kind').value);
-      const affected = Number(document.getElementById(verificado ? 'brig-affected' : 'cit-affected').value);
-      const severity = verificado ? Number(document.getElementById('brig-sev').value) : 0;
-
-      await fetch('/demo/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lon, kind, affected, verified: verificado, severity })
-      });
-      cargarEstado();
+    function focusZone(lat, lon) {
+      if (map) map.flyTo([lat, lon], 16, { duration: 0.6 });
     }
 
-    async function reiniciar() {
-      await fetch('/demo/reset', { method: 'POST' });
-      cargarEstado();
+    function toggleDispatch(event, id) {
+      event.stopPropagation();
+      if (dispatchedZones.has(id)) dispatchedZones.delete(id);
+      else dispatchedZones.add(id);
+      renderClusters(cachedClusters);
     }
 
-    async function cargarEstado() {
-      const res = await fetch('/demo/state');
-      const data = await res.json();
-
-      document.getElementById('ultima-trama').textContent =
-        'Última trama LoRa (25B): ' + (data.last_frame_hex || 'esperando datos...');
-
-      if (capaMapa) {
-        capaMapa.clearLayers();
-        data.clusters.forEach(c => {
-          const color = c.verified ? '#ff1744' : '#ffd600';
-          L.circle([c.lat, c.lon], { radius: 85, color, fillColor: color, fillOpacity: 0.3 })
-            .bindPopup(`<b>Clúster #${c.id} (${c.recommendation})</b><br>Urgencia: ${c.urgency}`)
-            .addTo(capaMapa);
+    function renderClusters(clusters) {
+      if (mapLayer) {
+        mapLayer.clearLayers();
+        clusters.forEach(c => {
+          const isDispatched = dispatchedZones.has(c.id);
+          const color = isDispatched ? '#166534' : (c.verified ? '#b91c1c' : '#92400e');
+          L.circle([c.lat, c.lon], {
+            radius: 85,
+            color: color,
+            weight: 1.5,
+            fillColor: color,
+            fillOpacity: 0.18
+          })
+          .bindPopup(`<b>Zona 0${c.id}</b><br>Urgencia: ${c.urgency}<br>Reportes: ${c.citizen_count + c.verified_count}`)
+          .addTo(mapLayer);
         });
       }
 
-      const lista = document.getElementById('lista-clusters');
-      if (!data.clusters.length) {
-        lista.innerHTML = '<p style="color:#94a3b8">Sin incidentes. Pulsa "⚡ 1. Simular 21 Alertas Ciudadanas".</p>';
+      const filtered = clusters.filter(c => {
+        if (currentFilter === 'verified') return c.verified;
+        if (currentFilter === 'unverified') return !c.verified;
+        return true;
+      });
+
+      const list = document.getElementById('cluster-list');
+      if (!filtered.length) {
+        list.innerHTML = '<div style="padding:24px 16px;color:var(--muted)">Sin incidentes para el filtro seleccionado.</div>';
         return;
       }
 
-      lista.innerHTML = data.clusters.map(c => {
-        const esFuerzaTarea = c.recommendation === 'FUERZA_TAREA';
-        const color = esFuerzaTarea ? 'var(--red)' : 'var(--yellow)';
-        const textoColor = esFuerzaTarea ? '#fff' : '#000';
-        const accion = esFuerzaTarea
-          ? '🚒 Despachar Fuerza de Tarea Pesada (USAR / Ambulancia)'
-          : '🏍️ Enviar Unidad Rápida de Reconocimiento (Sin confirmar)';
+      list.innerHTML = filtered.map(c => {
+        const isDispatched = dispatchedZones.has(c.id);
+        const isFT = c.recommendation === 'FUERZA_TAREA';
+        const tagClass = isDispatched ? 'dispatched' : (isFT ? 'critical' : 'warning');
+        const tagText = isDispatched ? 'UNIDAD EN CAMINO' : (isFT ? 'FUERZA DE TAREA' : 'RECONOCIMIENTO');
+        const recText = isFT
+          ? 'Despacho pesado (USAR / Ambulancia)'
+          : 'Unidad ligera de verificación (Sin confirmar)';
 
         return `
-          <div class="cluster ${c.verified ? 'verified' : ''}">
-            <div>
-              <strong>Zona #${c.id}</strong>
-              <span class="badge" style="background:${color};color:${textoColor}">${c.recommendation}</span>
-              <div style="font-size:13px;color:#cbd5e1;margin-top:4px">
-                Avisos ciudadanos: <b>${c.citizen_count}</b> · Verificados SCI: <b>${c.verified_count}</b> · Severidad: <b>${c.severity}/10</b>
+          <div class="item" onclick="focusZone(${c.lat}, ${c.lon})">
+            <div class="item-top">
+              <div class="zone-title">
+                <span>Zona 0${c.id}</span>
+                <span class="tag ${tagClass}">${tagText}</span>
+                <span class="coords">${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</span>
               </div>
-              <div style="font-size:12px;color:#38bdf8;margin-top:4px">${accion}</div>
+              <div class="score" title="Puntaje de urgencia (0-100)">U ${c.urgency}</div>
             </div>
-            <div style="text-align:right">
-              <small style="color:#94a3b8">URGENCIA</small>
-              <div style="font-size:24px;font-weight:900;color:${color}">${c.urgency}</div>
+            <div class="metrics">
+              Ciudadanos: <b>${c.citizen_count}</b> &middot;
+              Dictamen SCI: <b>${c.verified_count}</b> &middot;
+              Severidad: <b>${c.severity}/10</b> &middot;
+              Afectados est.: <b>${c.affected}</b>
+            </div>
+            <div class="item-foot">
+              <span class="recommendation">${recText}</span>
+              <button class="btn-dispatch ${isDispatched ? 'done' : ''}" onclick="toggleDispatch(event, ${c.id})">
+                ${isDispatched ? 'Unidad asignada' : 'Despachar unidad'}
+              </button>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    cargarEstado();
+    async function refreshState() {
+      const res = await fetch('/demo/state');
+      const data = await res.json();
+      cachedClusters = data.clusters || [];
+
+      document.getElementById('kpi-clusters').textContent = cachedClusters.length;
+      document.getElementById('kpi-verified').textContent = cachedClusters.filter(c => c.verified).length;
+      document.getElementById('kpi-reports').textContent = data.total_reports;
+      document.getElementById('last-frame').textContent =
+        'TRAMA LORA (25B): ' + (data.last_frame_hex || '—');
+
+      renderClusters(cachedClusters);
+    }
+
+    refreshState();
+    setInterval(refreshState, 5000);
   </script>
 </body>
 </html>

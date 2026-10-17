@@ -13,7 +13,6 @@ def test_demo_end_to_end_flow():
     home = client.get("/")
     assert home.status_code == 200
     assert "Dashboard del Puesto de Comando" in home.text
-    assert "SOS_MUNICIPIO" in home.text
 
     # 3. Simular ráfaga de 18 alertas ciudadanas en Zona A y 3 en Zona B
     sim = client.post("/demo/simulate")
