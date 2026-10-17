@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../lib/core/app_coordinator.dart';
 import '../lib/core/database/local_store.dart';
 import '../lib/core/protocol/binary_frame.dart';
-import '../lib/core/theme/oled_theme.dart';
 import '../lib/features/formularios_sci/sci_models.dart';
 import '../lib/features/triaje/start_triage_model.dart';
-import '../lib/main.dart';
 import '../lib/services/ble_service.dart';
 
 const String goldenHex = '010100038403070000f15365f84b3301402df8f90904004c78';

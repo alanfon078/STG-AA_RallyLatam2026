@@ -1,86 +1,202 @@
-import '../../core/database/local_store.dart';
+import 'package:flutter/material.dart';
+
 import '../../core/theme/oled_theme.dart';
-import '../../core/voice/offline_voice_service.dart';
-import '../../services/ble_service.dart';
+import 'start_triage_controller.dart';
 import 'start_triage_model.dart';
 
-/// Controlador de Triaje Médico START (SCI-207) en el Área de Concentración de Víctimas (ACV).
-/// Soporta incremento rápido en <= 3 toques con botones >= 64x64 dp y dictado por voz offline.
-class StartTriageController {
-  final OfflineTacticalStore store;
-  final StgBleService bleService;
-  final OfflineVoiceDictationService voiceService;
+export 'start_triage_controller.dart';
 
-  int rojoCount = 0;
-  int amarilloCount = 0;
-  int verdeCount = 0;
-  int negroCount = 0;
-  final List<StartVictimEntry> victims = [];
+/// Pantalla Flutter de Triaje Médico START (SCI-207) en el ACV.
+/// Tema OLED Black (#000000) y botones gigantes (>= 64x64 dp) para operación con guantes en <= 3 toques.
+class StartTriageScreen extends StatefulWidget {
+  final StartTriageController controller;
 
-  StartTriageController({
-    required this.store,
-    required this.bleService,
-    required this.voiceService,
-  });
+  const StartTriageScreen({Key? key, required this.controller})
+      : super(key: key);
 
-  double get minButtonDimensionDp => StgOledThemeSpec.minGloveButtonHeightDp;
+  @override
+  State<StartTriageScreen> createState() => _StartTriageScreenState();
+}
 
-  void incrementColor(StartColor color, {String conditionNote = ''}) {
-    switch (color) {
-      case StartColor.ROJO:
-        rojoCount++;
-        break;
-      case StartColor.AMARILLO:
-        amarilloCount++;
-        break;
-      case StartColor.VERDE:
-        verdeCount++;
-        break;
-      case StartColor.NEGRO:
-        negroCount++;
-        break;
-    }
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    victims.add(
-      StartVictimEntry(
-        compactId: store.nextCompactId('V'),
-        color: color,
-        tagCode: '${color.name.substring(0, 1)}-${victims.length + 1}',
-        conditionNote: conditionNote,
-        registeredAtSec: nowSec,
+class _StartTriageScreenState extends State<StartTriageScreen> {
+  String _statusMessage = 'ACV Listo — Toque un color START o dicte por voz';
+
+  void _onTapColor(StartColor color) {
+    setState(() {
+      widget.controller.incrementColor(color);
+      _statusMessage =
+          'Registrado ${color.name} (Total: ${widget.controller.victims.length})';
+    });
+  }
+
+  Future<void> _onTransmit() async {
+    final entry = await widget.controller.transmitAcvTriage(
+      acvName: 'ACV Principal',
+      lat: 20.1402,
+      lon: -101.1798,
+    );
+    setState(() {
+      _statusMessage =
+          'SCI-207 enviado a cola BLE (${entry.compactId} · Sev ${entry.frame.severity})';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.controller;
+    return Container(
+      color: const Color(StgOledThemeSpec.backgroundHex),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'SCI-207 · TRIAJE START (ACV)',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              children: [
+                _StartButton(
+                  label: 'ROJO (INMEDIATO)',
+                  count: c.rojoCount,
+                  color: const Color(StgOledThemeSpec.startRojoHex),
+                  textColor: Colors.white,
+                  onPressed: () => _onTapColor(StartColor.ROJO),
+                ),
+                _StartButton(
+                  label: 'AMARILLO (DEMORADO)',
+                  count: c.amarilloCount,
+                  color: const Color(StgOledThemeSpec.startAmarilloHex),
+                  textColor: Colors.black,
+                  onPressed: () => _onTapColor(StartColor.AMARILLO),
+                ),
+                _StartButton(
+                  label: 'VERDE (LEVE)',
+                  count: c.verdeCount,
+                  color: const Color(StgOledThemeSpec.startVerdeHex),
+                  textColor: Colors.black,
+                  onPressed: () => _onTapColor(StartColor.VERDE),
+                ),
+                _StartButton(
+                  label: 'NEGRO (FALLECIDO)',
+                  count: c.negroCount,
+                  color: const Color(StgOledThemeSpec.startNegroHex),
+                  textColor: Colors.white,
+                  onPressed: () => _onTapColor(StartColor.NEGRO),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: StgOledThemeSpec.minGloveButtonHeightDp,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white, width: 2),
+              ),
+              onPressed: () {
+                setState(() {
+                  c.applyVoiceDictation('un rojo dos amarillos');
+                  _statusMessage = 'Dictado por voz offline aplicado';
+                });
+              },
+              icon: const Icon(Icons.mic, size: 28),
+              label: const Text(
+                'DICTADO POR VOZ OFFLINE',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 72,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(StgOledThemeSpec.sciPcOrangeHex),
+                foregroundColor: Colors.black,
+              ),
+              onPressed: _onTransmit,
+              icon: const Icon(Icons.Bluetooth_connected, size: 28),
+              label: const Text(
+                'TRANSMITIR SCI-207 VÍA BLE / LORA',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _statusMessage,
+            style: const TextStyle(color: Colors.amberAccent, fontSize: 15),
+          ),
+        ],
       ),
     );
   }
+}
 
-  void applyVoiceDictation(String spokenText) {
-    final transcript = voiceService.simulateTranscript(spokenText);
-    final counts = voiceService.parseSpokenStartCounts(transcript);
-    rojoCount += counts['ROJO'] ?? 0;
-    amarilloCount += counts['AMARILLO'] ?? 0;
-    verdeCount += counts['VERDE'] ?? 0;
-    negroCount += counts['NEGRO'] ?? 0;
-  }
+class _StartButton extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  final Color textColor;
+  final VoidCallback onPressed;
 
-  Future<OutboxEntry> transmitAcvTriage({
-    required String acvName,
-    required double lat,
-    required double lon,
-  }) async {
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final summary = StartTriageSummary(
-      compactId: store.nextCompactId('207'),
-      acvName: acvName,
-      lat: lat,
-      lon: lon,
-      rojoCount: rojoCount,
-      amarilloCount: amarilloCount,
-      verdeCount: verdeCount,
-      negroCount: negroCount,
-      victims: List.unmodifiable(victims),
-      updatedAtSec: nowSec,
+  const _StartButton({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.textColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: StgOledThemeSpec.minGloveButtonWidthDp,
+      height: StgOledThemeSpec.minGloveButtonHeightDp,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: textColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: onPressed,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 44,
+                fontWeight: FontWeight.w900,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-    final entry = store.saveSci207Triage(summary);
-    await bleService.flushOutboxQueue();
-    return entry;
   }
 }

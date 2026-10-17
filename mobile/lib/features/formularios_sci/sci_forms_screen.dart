@@ -1,136 +1,235 @@
-import '../../core/database/local_store.dart';
+import 'package:flutter/material.dart';
+
 import '../../core/theme/oled_theme.dart';
-import '../../core/voice/offline_voice_service.dart';
-import '../../services/ble_service.dart';
+import 'sci_forms_controller.dart';
 import 'sci_models.dart';
 
-class Sci211RegistrationResult {
-  final Sci211Resource resource;
-  final SpanOfControlStatus spanOfControl;
+export 'sci_forms_controller.dart';
 
-  const Sci211RegistrationResult({
-    required this.resource,
-    required this.spanOfControl,
-  });
+/// Pantalla Flutter para captura táctica de formularios SCI-201, SCI-211,
+/// Bloqueos Viales, Alerta de Alcance de Control (CU-G03) y Transferencia de Mando QR/BLE (CU-G05).
+class SciFormsScreen extends StatefulWidget {
+  final SciFormsController controller;
+
+  const SciFormsScreen({Key? key, required this.controller}) : super(key: key);
+
+  @override
+  State<SciFormsScreen> createState() => _SciFormsScreenState();
 }
 
-/// Controlador de formularios tácticos SCI-201, SCI-211, Bloqueos Viales,
-/// Alerta de Alcance de Control (CU-G03) y Transferencia de Mando QR/BLE (CU-G05).
-/// Diseñado bajo la regla de máximo 3 toques y botones >= 64x64 dp.
-class SciFormsController {
-  final OfflineTacticalStore store;
-  final StgBleService bleService;
-  final OfflineVoiceDictationService voiceService;
+class _SciFormsScreenState extends State<SciFormsScreen> {
+  SpanOfControlStatus? _lastSpanStatus;
+  String? _lastQrPayload;
+  String _feedback = 'Seleccione acción SCI (máximo 3 toques)';
 
-  SciFormsController({
-    required this.store,
-    required this.bleService,
-    required this.voiceService,
+  Future<void> _sendQuickSci201() async {
+    final entry = await widget.controller.submitQuickSci201(
+      incidentName: 'Operación Zona Cero',
+      commanderName: 'Cmdte. Guardia',
+      kind: 0,
+      severity: 8,
+      securityPerimeter: const [
+        GeoPoint(20.139, -101.179),
+        GeoPoint(20.141, -101.179),
+        GeoPoint(20.141, -101.181),
+      ],
+      facilities: const [
+        SciFacility(
+          type: SciFacilityType.PC,
+          location: GeoPoint(20.140, -101.180),
+          label: 'Puesto de Comando',
+        ),
+        SciFacility(
+          type: SciFacilityType.E,
+          location: GeoPoint(20.1395, -101.1805),
+          label: 'Área de Espera E',
+        ),
+        SciFacility(
+          type: SciFacilityType.ACV,
+          location: GeoPoint(20.1402, -101.1798),
+          label: 'ACV Triaje',
+        ),
+      ],
+      situationSummary: 'Perímetro establecido e instalaciones PC/E/ACV activas',
+    );
+    setState(() {
+      _feedback = 'SCI-201 encolado (${entry.compactId})';
+    });
+  }
+
+  void _checkInResource(int subordinates) {
+    final result = widget.controller.registerSci211AndCheckSpan(
+      code: 'FT-USAR-$subordinates',
+      name: 'Fuerza de Tarea USAR',
+      resourceClass: SciResourceClass.FUERZA_TAREA,
+      resourceType: 1,
+      category: SciResourceCategory.RESCATE_URBANO,
+      status: SciResourceStatus.DISPONIBLE,
+      supervisor: 'Líder Rama Rescate',
+      subordinatesCount: subordinates,
+      lat: 20.140,
+      lon: -101.180,
+    );
+    setState(() {
+      _lastSpanStatus = result.spanOfControl;
+      _feedback = result.spanOfControl.message;
+    });
+  }
+
+  Future<void> _reportRoadBlock() async {
+    final entry = await widget.controller.submitQuickRoadBlock(
+      lat: 20.1408,
+      lon: -101.1803,
+      severity: 9,
+      hazardDescription: 'Puente colapsado / ruta bloqueada',
+    );
+    setState(() {
+      _feedback = 'Bloqueo vial reportado (${entry.compactId})';
+    });
+  }
+
+  void _generateCommandTransferQr() {
+    final qr = widget.controller.createCommandTransferQr(
+      incidentName: 'Operación Zona Cero',
+      outgoingCommander: 'Cmdte. Saliente',
+      incomingCommander: 'Cmdte. Entrante',
+      situationDigest: 'Control de perímetro y recursos SCI-211 transferidos',
+    );
+    setState(() {
+      _lastQrPayload = qr;
+      _feedback = 'Código QR de Transferencia de Mando (CU-G05) generado';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(StgOledThemeSpec.backgroundHex),
+      padding: const EdgeInsets.all(16),
+      child: ListView(
+        children: [
+          const Text(
+            'FORMULARIOS TÁCTICOS SCI',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_lastSpanStatus != null && _lastSpanStatus!.requiresAlert)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: const Color(StgOledThemeSpec.startRojoHex),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _lastSpanStatus!.message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          _GloveActionButton(
+            title: 'SCI-201 · ASUMIR MANDO E INSTALACIONES (PC, E, ACV)',
+            color: const Color(StgOledThemeSpec.sciPcOrangeHex),
+            textColor: Colors.black,
+            onPressed: _sendQuickSci201,
+          ),
+          const SizedBox(height: 12),
+          _GloveActionButton(
+            title: 'SCI-211 · CHECK-IN RECURSO (ALCANCE ÓPTIMO: 5)',
+            color: const Color(StgOledThemeSpec.startVerdeHex),
+            textColor: Colors.black,
+            onPressed: () => _checkInResource(5),
+          ),
+          const SizedBox(height: 12),
+          _GloveActionButton(
+            title: 'SCI-211 · SIMULAR SOBRECARGA (CU-G03 > 7 SUBORDINADOS)',
+            color: const Color(StgOledThemeSpec.startAmarilloHex),
+            textColor: Colors.black,
+            onPressed: () => _checkInResource(9),
+          ),
+          const SizedBox(height: 12),
+          _GloveActionButton(
+            title: 'REPORTAR BLOQUEO VIAL / PELIGRO EN RUTA',
+            color: const Color(StgOledThemeSpec.startRojoHex),
+            textColor: Colors.white,
+            onPressed: _reportRoadBlock,
+          ),
+          const SizedBox(height: 12),
+          _GloveActionButton(
+            title: 'CU-G05 · TRANSFERENCIA DE MANDO DIGITAL (QR / BLE)',
+            color: Colors.white,
+            textColor: Colors.black,
+            onPressed: _generateCommandTransferQr,
+          ),
+          if (_lastQrPayload != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(StgOledThemeSpec.surfaceHex),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white54),
+              ),
+              child: SelectableText(
+                'QR CU-G05: $_lastQrPayload',
+                style: const TextStyle(color: Colors.greenAccent, fontSize: 13),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            _feedback,
+            style: const TextStyle(color: Colors.amberAccent, fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GloveActionButton extends StatelessWidget {
+  final String title;
+  final Color color;
+  final Color textColor;
+  final VoidCallback onPressed;
+
+  const _GloveActionButton({
+    required this.title,
+    required this.color,
+    required this.textColor,
+    required this.onPressed,
   });
 
-  double get minButtonHeightDp => StgOledThemeSpec.minGloveButtonHeightDp;
-
-  /// Flujo en <= 3 toques para registrar SCI-201 con instalaciones (PC, E, ACV, B, C, H1)
-  Future<OutboxEntry> submitQuickSci201({
-    required String incidentName,
-    required String commanderName,
-    required int kind,
-    required int severity,
-    required List<SciFacility> facilities,
-    required List<GeoPoint> securityPerimeter,
-    required String situationSummary,
-  }) async {
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final report = Sci201Report(
-      compactId: store.nextCompactId('201'),
-      incidentName: incidentName,
-      commanderName: commanderName,
-      kind: kind,
-      severity: severity,
-      securityPerimeter: securityPerimeter,
-      facilities: facilities,
-      situationSummary: situationSummary,
-      createdAtSec: nowSec,
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: StgOledThemeSpec.minGloveButtonHeightDp,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: textColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        onPressed: onPressed,
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: textColor,
+          ),
+        ),
+      ),
     );
-    final entry = store.saveSci201(report);
-    await bleService.flushOutboxQueue();
-    return entry;
-  }
-
-  /// Registro de recursos SCI-211 y evaluación inmediata de Alcance de Control (CU-G03: 3..7, óptimo 5)
-  Sci211RegistrationResult registerSci211AndCheckSpan({
-    required String code,
-    required String name,
-    required SciResourceClass resourceClass,
-    required int resourceType,
-    required SciResourceCategory category,
-    required SciResourceStatus status,
-    required String supervisor,
-    required int subordinatesCount,
-    required double lat,
-    required double lon,
-  }) {
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final res = Sci211Resource(
-      compactId: store.nextCompactId('211'),
-      code: code,
-      name: name,
-      resourceClass: resourceClass,
-      resourceType: resourceType,
-      category: category,
-      status: status,
-      supervisor: supervisor,
-      subordinatesCount: subordinatesCount,
-      lat: lat,
-      lon: lon,
-      updatedAtSec: nowSec,
-    );
-    store.upsertSci211Resource(res);
-    final span = SpanOfControlStatus.evaluate(supervisor, subordinatesCount);
-    return Sci211RegistrationResult(resource: res, spanOfControl: span);
-  }
-
-  /// Flujo de 3 toques para reportar un bloqueo vial georreferenciado
-  Future<OutboxEntry> submitQuickRoadBlock({
-    required double lat,
-    required double lon,
-    required int severity,
-    required String hazardDescription,
-    double radiusMeters = 60.0,
-  }) async {
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final report = RoadBlockReport(
-      compactId: store.nextCompactId('RB'),
-      lat: lat,
-      lon: lon,
-      severity: severity,
-      radiusMeters: radiusMeters,
-      hazardDescription: hazardDescription,
-      createdAtSec: nowSec,
-    );
-    final entry = store.saveRoadBlock(report);
-    await bleService.flushOutboxQueue();
-    return entry;
-  }
-
-  /// CU-G05: Genera y registra la transferencia de mando cara a cara (QR / BLE)
-  String createCommandTransferQr({
-    required String incidentName,
-    required String outgoingCommander,
-    required String incomingCommander,
-    required String situationDigest,
-  }) {
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final payload = CommandTransferPayload(
-      compactId: store.nextCompactId('CMD'),
-      incidentName: incidentName,
-      outgoingCommander: outgoingCommander,
-      incomingCommander: incomingCommander,
-      situationDigest: situationDigest,
-      activeResources: store.sci211Resources.length,
-      timestampSec: nowSec,
-    );
-    store.recordCommandTransfer(payload);
-    return payload.toQrPayload();
   }
 }
