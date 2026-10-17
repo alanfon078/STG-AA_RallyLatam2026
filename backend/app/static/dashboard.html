@@ -214,6 +214,11 @@
 
       <div class="list" id="cluster-list"></div>
 
+      <div class="panel-bar" style="border-top:1px solid var(--line)">
+        <span>Bitácora de Campo · Bloqueos Viales y Recursos (SCI-211)</span>
+      </div>
+      <div id="field-list" style="max-height:175px;overflow-y:auto"></div>
+
       <footer id="last-frame">TRAMA LORA (25B): —</footer>
     </aside>
   </div>
@@ -225,6 +230,8 @@
     let currentFilter = 'all';
     let dispatchedZones = new Set();
     let cachedClusters = [];
+    let cachedRoadblocks = [];
+    let cachedResources = [];
 
     if (typeof L !== 'undefined') {
       map = L.map('map', { zoomControl: true }).setView([20.141, -101.179], 14);
@@ -267,6 +274,18 @@
             fillOpacity: 0.18
           })
           .bindPopup(`<b>Zona 0${c.id}</b><br>Urgencia: ${c.urgency}<br>Reportes: ${c.citizen_count + c.verified_count}`)
+          .addTo(mapLayer);
+        });
+
+        cachedRoadblocks.forEach(rb => {
+          L.circleMarker([rb.lat, rb.lon], {
+            radius: 7,
+            color: '#111111',
+            weight: 2,
+            fillColor: '#b91c1c',
+            fillOpacity: 0.95
+          })
+          .bindPopup(`<b>BLOQUEO VIAL · ${rb.street}</b><br>${rb.cause} (${rb.closure})`)
           .addTo(mapLayer);
         });
       }
@@ -317,12 +336,35 @@
           </div>
         `;
       }).join('');
+
+      const fieldList = document.getElementById('field-list');
+      const rbItems = cachedRoadblocks.map(rb => `
+        <div class="item" style="padding:10px 16px" onclick="focusZone(${rb.lat}, ${rb.lon})">
+          <div class="zone-title">
+            <span class="tag critical">BLOQUEO VIAL</span>
+            <span>${rb.street}</span>
+          </div>
+          <div class="metrics" style="margin:4px 0 0">${rb.cause} &middot; <b>${rb.closure}</b></div>
+        </div>
+      `);
+      const resItems = cachedResources.map(r => `
+        <div class="item" style="padding:10px 16px">
+          <div class="zone-title">
+            <span class="tag warning">SCI-211 RECURSO</span>
+            <span>${r.resource}</span>
+          </div>
+          <div class="metrics" style="margin:4px 0 0">${r.zone} &middot; Estado: <b>${r.unit_status}</b> ${r.notes ? '&middot; ' + r.notes : ''}</div>
+        </div>
+      `);
+      fieldList.innerHTML = [...rbItems, ...resItems].join('') || '<div style="padding:12px 16px;color:var(--muted)">Sin reportes adicionales.</div>';
     }
 
     async function refreshState() {
       const res = await fetch('/demo/state');
       const data = await res.json();
       cachedClusters = data.clusters || [];
+      cachedRoadblocks = data.roadblocks || [];
+      cachedResources = data.resources || [];
 
       document.getElementById('kpi-clusters').textContent = cachedClusters.length;
       document.getElementById('kpi-verified').textContent = cachedClusters.filter(c => c.verified).length;

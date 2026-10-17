@@ -14,6 +14,8 @@ class StoredReport:
 _reports: list[StoredReport] = []
 _seen_keys: set[tuple[int, int, int]] = set()
 _last_frame_hex: str = ""
+_roadblocks: list[dict] = []
+_resource_requests: list[dict] = []
 
 
 def insert_report(frame: Frame) -> bool:
@@ -54,6 +56,39 @@ def fetch_reports(window_min: int = 10) -> list[Report]:
     ]
 
 
+def add_roadblock(street: str, cause: str, closure: str, lat: float, lon: float) -> dict:
+    entry = {
+        "id": len(_roadblocks) + 1,
+        "street": street,
+        "cause": cause,
+        "closure": closure,
+        "lat": lat,
+        "lon": lon,
+    }
+    _roadblocks.insert(0, entry)
+    return entry
+
+
+def fetch_roadblocks() -> list[dict]:
+    return list(_roadblocks)
+
+
+def add_resource_request(zone: str, resource: str, unit_status: str, notes: str) -> dict:
+    entry = {
+        "id": len(_resource_requests) + 1,
+        "zone": zone,
+        "resource": resource,
+        "unit_status": unit_status,
+        "notes": notes,
+    }
+    _resource_requests.insert(0, entry)
+    return entry
+
+
+def fetch_resource_requests() -> list[dict]:
+    return list(_resource_requests)
+
+
 def get_last_frame_hex() -> str:
     return _last_frame_hex
 
@@ -63,4 +98,6 @@ def clear_reports() -> None:
     global _last_frame_hex
     _reports.clear()
     _seen_keys.clear()
+    _roadblocks.clear()
+    _resource_requests.clear()
     _last_frame_hex = ""

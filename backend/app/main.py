@@ -14,7 +14,15 @@ from pydantic import BaseModel, Field
 from .config import settings
 from .frame import FLAG_BRIGADISTA, FLAG_PRIORITY, Frame
 from .ingest import SerialIngest, ingest_hex
-from .repository import clear_reports, fetch_reports, get_last_frame_hex
+from .repository import (
+    add_resource_request,
+    add_roadblock,
+    clear_reports,
+    fetch_reports,
+    fetch_resource_requests,
+    fetch_roadblocks,
+    get_last_frame_hex,
+)
 from .service import build_clusters
 
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +49,21 @@ class DemoReportIn(BaseModel):
     affected: int = Field(default=1, ge=0, le=999)
     verified: bool = False
     severity: int = Field(default=0, ge=0, le=10)
+
+
+class RoadblockIn(BaseModel):
+    street: str
+    cause: str
+    closure: str = "Cierre total"
+    lat: float = 20.1382
+    lon: float = -101.1815
+
+
+class ResourceRequestIn(BaseModel):
+    zone: str
+    resource: str
+    unit_status: str = "Solicitado urgente"
+    notes: str = ""
 
 
 def _seed_initial_data() -> None:
@@ -84,6 +107,9 @@ def _seed_initial_data() -> None:
             affected=rng.randint(1, 3),
         )
         ingest_hex(f.encode().hex())
+
+    add_roadblock("Av. Morelos Poniente", "Escombros / Derrumbe", "Cierre total", 20.1385, -101.1818)
+    add_resource_request("Zona 01 · Centro", "Fuerza de Tarea USAR / BREC", "Asignado en escena", "Extracción activa")
 
 
 @asynccontextmanager
@@ -150,6 +176,11 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/ingest/frame")
+def ingest_frame_info() -> dict:
+    return {"endpoint": "POST /ingest/frame", "last_frame_hex": get_last_frame_hex()}
+
+
 @app.post("/ingest/frame")
 def ingest_frame(body: FrameIn) -> dict:
     try:
@@ -162,6 +193,16 @@ def ingest_frame(body: FrameIn) -> dict:
         "seq": frame.seq,
         "verified": frame.verified,
     }
+
+
+@app.post("/field/roadblock")
+def report_roadblock(body: RoadblockIn) -> dict:
+    return add_roadblock(body.street, body.cause, body.closure, body.lat, body.lon)
+
+
+@app.post("/field/resource")
+def report_resource(body: ResourceRequestIn) -> dict:
+    return add_resource_request(body.zone, body.resource, body.unit_status, body.notes)
 
 
 @app.get("/clusters")
@@ -177,6 +218,8 @@ def demo_state() -> dict:
         "last_frame_hex": get_last_frame_hex(),
         "total_reports": len(reports),
         "clusters": [asdict(c) for c in build_clusters(reports, settings.cluster_radius_m)],
+        "roadblocks": fetch_roadblocks(),
+        "resources": fetch_resource_requests(),
     }
 
 
