@@ -6,3 +6,10 @@ __pycache__/
 .pio/
 .vscode/
 firmware/tools/frame_check
+mobile/.dart_tool/
+mobile/build/
+mobile/pubspec.lock
+mobile/android/local.properties
+mobile/android/app/src/main/java/
+mobile/ios/Flutter/
+mobile/ios/Runner/GeneratedPluginRegistrant.*
