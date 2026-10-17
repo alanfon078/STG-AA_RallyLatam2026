@@ -50,12 +50,12 @@ Prioridad: **P0** bloqueante / demo · **P1** necesario para producto · **P2** 
 
 ## 3. Motor de asignación de recursos — P1
 
-- [ ] Modelo de recursos (SCI-211): clase, tipo 1–4, categoría, estado (*Disponible/Asignado/No disponible*)
-- [ ] Algoritmo de asignación óptima N recursos ↔ M incidentes (voraz o programación lineal)
-- [ ] Ruteo/ETA considerando bloqueos viales
-- [ ] Consola de despacho: asignar, reasignar y liberar recursos
-- [ ] Ciclo de vida del incidente: *Pendiente → En atención → Resuelto / Falsa alarma*, con hora de cierre
-- [ ] Auditoría (quién/cuándo/qué) de cada decisión de despacho
+- [X] Modelo de recursos (SCI-211): clase, tipo 1–4, categoría, estado (*Disponible/Asignado/No disponible*)
+- [X] Algoritmo de asignación óptima N recursos ↔ M incidentes (voraz o programación lineal)
+- [X] Ruteo/ETA considerando bloqueos viales
+- [X] Consola de despacho: asignar, reasignar y liberar recursos
+- [X] Ciclo de vida del incidente: *Pendiente → En atención → Resuelto / Falsa alarma*, con hora de cierre
+- [X] Auditoría (quién/cuándo/qué) de cada decisión de despacho
 
 ## 4. App móvil para brigadistas (Flutter) — P1
 
