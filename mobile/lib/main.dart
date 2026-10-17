@@ -1,96 +1,181 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
-import 'core/app_coordinator.dart';
-import 'core/theme/oled_theme.dart';
-import 'features/formularios_sci/sci_forms_screen.dart';
-import 'features/mapa_offline/offline_map_screen.dart';
-import 'features/triaje/start_triage_screen.dart';
+import 'binary_frame.dart';
 
-export 'core/app_coordinator.dart';
+void main() => runApp(const BrigadistaApp());
 
-void main() {
-  final coordinator = StgTacticalMobileApp.wired(nodeId: 100);
-  coordinator.bleService.pairWithDevice('STG-AA-NODO-100');
-  runApp(StgBrigadistaFlutterApp(coordinator: coordinator));
-}
-
-/// Aplicación Flutter Táctica Offline-First para Brigadistas (STG-AA).
-/// Tema nativo OLED Black (#000000), botones >= 64x64 dp para guantes y flujo en <= 3 toques.
-class StgBrigadistaFlutterApp extends StatefulWidget {
-  final StgTacticalMobileApp coordinator;
-
-  const StgBrigadistaFlutterApp({Key? key, required this.coordinator})
-      : super(key: key);
-
-  @override
-  State<StgBrigadistaFlutterApp> createState() =>
-      _StgBrigadistaFlutterAppState();
-}
-
-class _StgBrigadistaFlutterAppState extends State<StgBrigadistaFlutterApp> {
-  int _selectedIndex = 0;
+class BrigadistaApp extends StatelessWidget {
+  const BrigadistaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.coordinator;
-    final screens = [
-      StartTriageScreen(controller: c.startTriage),
-      SciFormsScreen(controller: c.sciForms),
-      OfflineMapScreen(mapController: c.offlineMap, store: c.store),
-    ];
-
     return MaterialApp(
-      title: 'STG-AA Brigadista SCI',
+      title: 'STG-AA · Brigadista SCI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(StgOledThemeSpec.backgroundHex),
-        canvasColor: const Color(StgOledThemeSpec.backgroundHex),
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFFF6F6F3),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF111111)),
+        useMaterial3: true,
       ),
-      home: Scaffold(
-        backgroundColor: const Color(StgOledThemeSpec.backgroundHex),
-        appBar: AppBar(
-          backgroundColor: const Color(StgOledThemeSpec.surfaceHex),
-          title: const Text(
-            'STG-AA · TERMINAL TÁCTICA SCI',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+      home: const TriageHomePage(),
+    );
+  }
+}
+
+class TriageHomePage extends StatefulWidget {
+  const TriageHomePage({super.key});
+
+  @override
+  State<TriageHomePage> createState() => _TriageHomePageState();
+}
+
+class _TriageHomePageState extends State<TriageHomePage> {
+  int _seq = 1;
+  String _selectedZone = '20.1355,-101.1845,2';
+  int _rojo = 2, _amarillo = 2, _verde = 1, _negro = 0;
+  double _severity = 9;
+  String _status = 'Listo para empaquetar trama de 25 bytes (FLAG_BRIGADISTA).';
+
+  Future<void> _transmit() async {
+    final parts = _selectedZone.split(',');
+    final total = (_rojo + _amarillo + _verde + _negro).clamp(1, 999);
+    final frame = StgFrame(
+      kind: int.parse(parts[2]),
+      seq: _seq++,
+      nodeTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      lat: double.parse(parts[0]),
+      lon: double.parse(parts[1]),
+      severity: _severity.round(),
+      affected: total,
+    );
+    final hex = frame.encodeHex();
+
+    setState(() => _status = 'Transmitiendo trama 25B: $hex');
+    try {
+      await http.post(
+        Uri.parse('http://127.0.0.1:8000/ingest/frame'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'hex': hex}),
+      );
+      setState(() => _status = 'CONFIRMADO · Trama 25B recibida por el Puesto de Comando: $hex');
+    } catch (_) {
+      setState(() => _status = 'Trama 25B generada para BLE/LoRa: $hex');
+    }
+  }
+
+  Widget _counterCard(String title, String sub, int value, Color color, ValueChanged<int> onDelta) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(left: BorderSide(color: color, width: 5)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          Text(sub, style: const TextStyle(color: Colors.black54, fontSize: 11)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(onPressed: () => onDelta(-1), icon: const Icon(Icons.remove)),
+              Text('$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              IconButton(onPressed: () => onDelta(1), icon: const Icon(Icons.add)),
+            ],
           ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Center(
-                child: Text(
-                  'BLE: ${c.bleService.status.name} | ACK: ${c.store.ackedCount}/${c.store.outboxEntries.length}',
-                  style: const TextStyle(
-                    color: Colors.greenAccent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text(
+          'STG-AA · Dictamen Táctico SCI-201 / START',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              DropdownButtonFormField<String>(
+                value: _selectedZone,
+                decoration: const InputDecoration(
+                  labelText: '1. Zona de intervención a verificar',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: '20.1355,-101.1845,2', child: Text('Zona 02 · Sector Sur (Sin verificar)')),
+                  DropdownMenuItem(value: '20.1475,-101.1710,1', child: Text('Zona 03 · Sector Oriente (Sin verificar)')),
+                  DropdownMenuItem(value: '20.1410,-101.1790,0', child: Text('Zona 01 · Centro (Actualizar)')),
+                ],
+                onChanged: (v) => setState(() => _selectedZone = v!),
+              ),
+              const SizedBox(height: 16),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.35,
+                children: [
+                  _counterCard('ROJO · INMEDIATO', 'Riesgo vital', _rojo, const Color(0xFFB91C1C),
+                      (d) => setState(() => _rojo = (_rojo + d).clamp(0, 99))),
+                  _counterCard('AMARILLO · DEMORADO', 'Grave estable', _amarillo, const Color(0xFFB45309),
+                      (d) => setState(() => _amarillo = (_amarillo + d).clamp(0, 99))),
+                  _counterCard('VERDE · MENOR', 'Ambulatorio', _verde, const Color(0xFF15803D),
+                      (d) => setState(() => _verde = (_verde + d).clamp(0, 99))),
+                  _counterCard('NEGRO · FALLECIDO', 'Sin signos', _negro, const Color(0xFF27272A),
+                      (d) => setState(() => _negro = (_negro + d).clamp(0, 99))),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('3. Severidad en sitio: ${_severity.round()} / 10',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Slider(
+                      value: _severity,
+                      min: 1,
+                      max: 10,
+                      divisions: 9,
+                      activeColor: const Color(0xFFB91C1C),
+                      onChanged: (v) => setState(() => _severity = v),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-        body: screens[_selectedIndex],
-        bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color(StgOledThemeSpec.surfaceHex),
-          selectedItemColor: const Color(StgOledThemeSpec.sciPcOrangeHex),
-          unselectedItemColor: Colors.white70,
-          currentIndex: _selectedIndex,
-          onTap: (idx) => setState(() => _selectedIndex = idx),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.medical_services, size: 30),
-              label: 'Triaje START (207)',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.assignment_turned_in, size: 30),
-              label: 'SCI 201 / 211',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.map, size: 30),
-              label: 'Mapa Offline',
-            ),
-          ],
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 50,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF111111)),
+                  onPressed: _transmit,
+                  child: const Text('Transmitir dictamen verificado (LoRa)'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(_status, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );
