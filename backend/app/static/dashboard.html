@@ -81,7 +81,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     let map = null, mapLayer = null, currentFilter = 'all';
-    let dispatchedZones = new Set(), cachedClusters = [], cachedRoadblocks = [], cachedResources = [];
+    let dispatchedZones = new Set(), selectedBlocks = new Set();
+    let cachedClusters = [], cachedRoadblocks = [], cachedResources = [];
 
     if (typeof L !== 'undefined') {
       map = L.map('map').setView([20.141, -101.179], 14);
@@ -100,6 +101,12 @@
       if (map) map.flyTo([lat, lon], 16, { duration: 0.6 });
     }
 
+    function selectRoadblock(id, lat, lon) {
+      selectedBlocks.has(id) ? selectedBlocks.delete(id) : selectedBlocks.add(id);
+      focusZone(lat, lon);
+      render();
+    }
+
     function toggleDispatch(e, id) {
       e.stopPropagation();
       dispatchedZones.has(id) ? dispatchedZones.delete(id) : dispatchedZones.add(id);
@@ -115,8 +122,19 @@
             .bindPopup(`<b>Zona 0${c.id}</b><br>Urgencia: ${c.urgency}`).addTo(mapLayer);
         });
         cachedRoadblocks.forEach(rb => {
-          L.circleMarker([rb.lat, rb.lon], { radius: 7, color: '#111', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.95 })
-            .bindPopup(`<b>BLOQUEO VIAL · ${rb.street}</b><br>${rb.cause} (${rb.closure})`).addTo(mapLayer);
+          const popup = `<b>BLOQUEO VIAL · ${rb.street}</b><br>${rb.cause} (${rb.closure})`;
+          if (selectedBlocks.has(rb.id)) {
+            const xIcon = L.divIcon({
+              className: '',
+              html: '<div style="color:#d90429;font-size:26px;font-weight:900;line-height:24px;text-align:center;text-shadow:0 0 3px #fff,0 0 3px #fff">✕</div>',
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            });
+            L.marker([rb.lat, rb.lon], { icon: xIcon }).bindPopup(popup).addTo(mapLayer);
+          } else {
+            L.circleMarker([rb.lat, rb.lon], { radius: 7, color: '#111', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.95 })
+              .bindPopup(popup).addTo(mapLayer);
+          }
         });
       }
 
@@ -148,11 +166,14 @@
           </div>`;
       }).join('');
 
-      const rbHtml = cachedRoadblocks.map(rb => `
-        <div class="item" style="padding:9px 16px" onclick="focusZone(${rb.lat}, ${rb.lon})">
-          <span class="tag critical">BLOQUEO VIAL</span> <strong>${rb.street}</strong>
+      const rbHtml = cachedRoadblocks.map(rb => {
+        const isSel = selectedBlocks.has(rb.id);
+        return `
+        <div class="item" style="padding:9px 16px;${isSel ? 'background:#fef2f2' : ''}" onclick="selectRoadblock(${rb.id}, ${rb.lat}, ${rb.lon})">
+          <span class="tag critical">${isSel ? '✕ BLOQUEO VIAL' : 'BLOQUEO VIAL'}</span> <strong>${rb.street}</strong>
           <div class="metrics" style="margin:3px 0 0">${rb.cause} &middot; <b>${rb.closure}</b></div>
-        </div>`);
+        </div>`;
+      });
       const resHtml = cachedResources.map(r => `
         <div class="item" style="padding:9px 16px">
           <span class="tag warning">SCI-211</span> <strong>${r.resource}</strong>
