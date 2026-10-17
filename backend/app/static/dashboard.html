@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>STG-AA · Dashboard del Puesto de Comando</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f19;
+      --panel: #131b2e;
+      --border: #26334d;
+      --red: #ff1744;
+      --yellow: #ffd600;
+      --green: #00e676;
+      --orange: #ff6d00;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: #f1f5f9; font-family: system-ui, sans-serif; }
+    header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+      gap: 10px; padding: 12px 20px; background: #070a12; border-bottom: 1px solid var(--border);
+    }
+    header h1 { margin: 0; font-size: 18px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 700; cursor: pointer;
+    }
+    .grid {
+      display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; padding: 16px 20px; max-width: 1500px; margin: 0 auto;
+    }
+    .mocks {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 20px 20px; max-width: 1500px; margin: 0 auto;
+    }
+    @media (max-width: 950px) { .grid, .mocks { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 16px; }
+    #map { width: 100%; height: 380px; border-radius: 8px; background: #090d16; }
+    .cluster {
+      background: #0b111e; border-left: 6px solid var(--yellow); border-radius: 8px;
+      padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .cluster.verified { border-left-color: var(--red); }
+    .badge { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 900; }
+    .hex {
+      font-family: monospace; background: #070a12; padding: 8px; border-radius: 6px;
+      color: var(--green); font-size: 13px; margin-top: 10px; word-break: break-all;
+    }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; }
+    select, input { background: #0b111e; color: #fff; border: 1px solid #475569; border-radius: 6px; padding: 6px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>🟧 [PC] STG-AA · Dashboard del Puesto de Comando</h1>
+      <small style="color:#94a3b8">Triaje Georreferenciado y Asignación Algorítmica · Red LoRa 915 MHz</small>
+    </div>
+    <div class="toolbar">
+      <button style="background:#38bdf8;color:#000" onclick="simularRafaga()">
+        ⚡ 1. Simular 21 Alertas Ciudadanas
+      </button>
+      <button style="background:var(--orange);color:#000" onclick="enviarReporte(true, 20.140, -101.180)">
+        🩺 2. Verificar Zona A (Brigadista SCI)
+      </button>
+      <button style="background:#334155;color:#fff" onclick="reiniciar()">
+        ↺ Reiniciar
+      </button>
+    </div>
+  </header>
+
+  <!-- DASHBOARD PRINCIPAL: MAPA + COLA DE PRIORIZACIÓN -->
+  <main class="grid">
+    <section class="card">
+      <h2>🗺️ Mapa Táctico de Clústeres (DBSCAN · Radio 80 m)</h2>
+      <div id="map"></div>
+    </section>
+
+    <section class="card">
+      <h2>🚨 Cola Priorizada por Puntaje de Urgencia (0–100)</h2>
+      <div id="lista-clusters"></div>
+      <div class="hex" id="ultima-trama">Última trama LoRa (25B): esperando datos...</div>
+    </section>
+  </main>
+
+  <!-- MOCKS INTERACTIVOS DE LOS 2 NIVELES DE CAPTURA -->
+  <section class="mocks">
+    <!-- Nivel 1: Portal Cautivo Ciudadano -->
+    <div class="card">
+      <h2>📱 Mock Nivel 1: Portal Cautivo Ciudadano (Wi-Fi: SOS_MUNICIPIO)</h2>
+      <div class="row">
+        <span>Tipo de emergencia:</span>
+        <select id="cit-kind">
+          <option value="0">🏚️ Derrumbe</option>
+          <option value="1">🆘 Persona atrapada</option>
+          <option value="2">🌊 Inundación</option>
+          <option value="3">🔥 Incendio</option>
+          <option value="4">🩸 Herido grave</option>
+        </select>
+      </div>
+      <div class="row">
+        <span>Personas afectadas:</span>
+        <input type="number" id="cit-affected" value="2" min="1" max="50">
+      </div>
+      <button style="background:#e00000;color:#fff;width:100%" onclick="enviarReporte(false, 20.140, -101.180)">
+        Enviar SOS Ciudadano (Sin Internet)
+      </button>
+    </div>
+
+    <!-- Nivel 2: App Móvil Brigadista -->
+    <div class="card">
+      <h2>🩺 Mock Nivel 2: App Brigadista Offline-First (Bluetooth → LoRa)</h2>
+      <div class="row">
+        <span>Severidad Triaje START (1–10):</span>
+        <input type="number" id="brig-sev" value="9" min="1" max="10">
+      </div>
+      <div class="row">
+        <span>Víctimas confirmadas en el ACV:</span>
+        <input type="number" id="brig-affected" value="4" min="1" max="50">
+      </div>
+      <button style="background:var(--orange);color:#000;width:100%" onclick="enviarReporte(true, 20.140, -101.180)">
+        Transmitir Dictamen Verificado (FLAG_BRIGADISTA)
+      </button>
+    </div>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let map = null;
+    let capaMapa = null;
+
+    if (typeof L !== 'undefined') {
+      map = L.map('map').setView([20.146, -101.173], 14);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+      capaMapa = L.layerGroup().addTo(map);
+    }
+
+    async function simularRafaga() {
+      await fetch('/demo/simulate', { method: 'POST' });
+      cargarEstado();
+    }
+
+    async function enviarReporte(verificado, lat, lon) {
+      const kind = verificado ? 4 : Number(document.getElementById('cit-kind').value);
+      const affected = Number(document.getElementById(verificado ? 'brig-affected' : 'cit-affected').value);
+      const severity = verificado ? Number(document.getElementById('brig-sev').value) : 0;
+
+      await fetch('/demo/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon, kind, affected, verified: verificado, severity })
+      });
+      cargarEstado();
+    }
+
+    async function reiniciar() {
+      await fetch('/demo/reset', { method: 'POST' });
+      cargarEstado();
+    }
+
+    async function cargarEstado() {
+      const res = await fetch('/demo/state');
+      const data = await res.json();
+
+      document.getElementById('ultima-trama').textContent =
+        'Última trama LoRa (25B): ' + (data.last_frame_hex || 'esperando datos...');
+
+      if (capaMapa) {
+        capaMapa.clearLayers();
+        data.clusters.forEach(c => {
+          const color = c.verified ? '#ff1744' : '#ffd600';
+          L.circle([c.lat, c.lon], { radius: 85, color, fillColor: color, fillOpacity: 0.3 })
+            .bindPopup(`<b>Clúster #${c.id} (${c.recommendation})</b><br>Urgencia: ${c.urgency}`)
+            .addTo(capaMapa);
+        });
+      }
+
+      const lista = document.getElementById('lista-clusters');
+      if (!data.clusters.length) {
+        lista.innerHTML = '<p style="color:#94a3b8">Sin incidentes. Pulsa "⚡ 1. Simular 21 Alertas Ciudadanas".</p>';
+        return;
+      }
+
+      lista.innerHTML = data.clusters.map(c => {
+        const esFuerzaTarea = c.recommendation === 'FUERZA_TAREA';
+        const color = esFuerzaTarea ? 'var(--red)' : 'var(--yellow)';
+        const textoColor = esFuerzaTarea ? '#fff' : '#000';
+        const accion = esFuerzaTarea
+          ? '🚒 Despachar Fuerza de Tarea Pesada (USAR / Ambulancia)'
+          : '🏍️ Enviar Unidad Rápida de Reconocimiento (Sin confirmar)';
+
+        return `
+          <div class="cluster ${c.verified ? 'verified' : ''}">
+            <div>
+              <strong>Zona #${c.id}</strong>
+              <span class="badge" style="background:${color};color:${textoColor}">${c.recommendation}</span>
+              <div style="font-size:13px;color:#cbd5e1;margin-top:4px">
+                Avisos ciudadanos: <b>${c.citizen_count}</b> · Verificados SCI: <b>${c.verified_count}</b> · Severidad: <b>${c.severity}/10</b>
+              </div>
+              <div style="font-size:12px;color:#38bdf8;margin-top:4px">${accion}</div>
+            </div>
+            <div style="text-align:right">
+              <small style="color:#94a3b8">URGENCIA</small>
+              <div style="font-size:24px;font-weight:900;color:${color}">${c.urgency}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    cargarEstado();
+  </script>
+</body>
+</html>

@@ -1,66 +1,66 @@
-from sqlalchemy import text
+import time
+from dataclasses import dataclass
 
 from .clustering import Report
-from .db import engine
-from .frame import FLAG_BRIGADISTA, Frame
+from .frame import Frame
 
-_INSERT = text(
-    """
-    INSERT INTO reports (node_id, seq, node_time, flags, kind, severity, affected, geom)
-    VALUES (
-        :node_id, :seq, :node_time, :flags, :kind, :severity, :affected,
-        ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)
-    )
-    ON CONFLICT (node_id, seq, node_time) DO NOTHING
-    """
-)
 
-_SELECT = text(
-    """
-    SELECT id, node_id, flags, kind, severity, affected,
-           ST_Y(geom) AS lat, ST_X(geom) AS lon
-    FROM reports
-    WHERE (flags & :verified_flag) = :verified_flag
-       OR received_at > now() - make_interval(mins => :window)
-    ORDER BY id
-    """
-)
+@dataclass
+class StoredReport:
+    report: Report
+    received_at: float
+
+
+_reports: list[StoredReport] = []
+_seen_keys: set[tuple[int, int, int]] = set()
+_last_frame_hex: str = ""
 
 
 def insert_report(frame: Frame) -> bool:
-    with engine.begin() as conn:
-        result = conn.execute(
-            _INSERT,
-            {
-                "node_id": frame.node_id,
-                "seq": frame.seq,
-                "node_time": frame.node_time,
-                "flags": frame.flags,
-                "kind": frame.kind,
-                "severity": frame.severity,
-                "affected": frame.affected,
-                "lat": frame.lat,
-                "lon": frame.lon,
-            },
+    """Guarda un reporte en memoria evitando duplicados por (node_id, seq, node_time)."""
+    global _last_frame_hex
+    key = (frame.node_id, frame.seq, frame.node_time)
+    if key in _seen_keys:
+        return False
+
+    _seen_keys.add(key)
+    _last_frame_hex = frame.encode().hex()
+    new_id = len(_reports) + 1
+    _reports.append(
+        StoredReport(
+            report=Report(
+                id=new_id,
+                node_id=frame.node_id,
+                verified=frame.verified,
+                kind=frame.kind,
+                severity=frame.severity,
+                affected=frame.affected,
+                lat=frame.lat,
+                lon=frame.lon,
+            ),
+            received_at=time.time(),
         )
-        return result.rowcount == 1
+    )
+    return True
 
 
-def fetch_reports(window_min: int) -> list[Report]:
-    with engine.connect() as conn:
-        rows = conn.execute(
-            _SELECT, {"verified_flag": FLAG_BRIGADISTA, "window": window_min}
-        ).all()
+def fetch_reports(window_min: int = 10) -> list[Report]:
+    """Devuelve los reportes recientes dentro de la ventana de tiempo o verificados."""
+    cutoff = time.time() - (window_min * 60)
     return [
-        Report(
-            id=row.id,
-            node_id=row.node_id,
-            verified=bool(row.flags & FLAG_BRIGADISTA),
-            kind=row.kind,
-            severity=row.severity,
-            affected=row.affected,
-            lat=row.lat,
-            lon=row.lon,
-        )
-        for row in rows
+        item.report
+        for item in _reports
+        if item.report.verified or item.received_at >= cutoff
     ]
+
+
+def get_last_frame_hex() -> str:
+    return _last_frame_hex
+
+
+def clear_reports() -> None:
+    """Limpia los reportes en memoria para reiniciar la demostración en vivo."""
+    global _last_frame_hex
+    _reports.clear()
+    _seen_keys.clear()
+    _last_frame_hex = ""
