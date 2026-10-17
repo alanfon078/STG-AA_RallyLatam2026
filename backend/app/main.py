@@ -120,8 +120,10 @@ async def portal_sos(request: Request) -> dict:
     affected = max(1, min(999, int(params.get("affected", ["1"])[0] or 1)))
     lat_raw = params.get("lat", [""])[0]
     lon_raw = params.get("lon", [""])[0]
-    lat = float(lat_raw) if lat_raw else 20.1410
-    lon = float(lon_raw) if lon_raw else -101.1790
+    lat = float(lat_raw) if lat_raw else 20.1355
+    lon = float(lon_raw) if lon_raw else -101.1845
+    if abs(lat - 20.141) > 0.03 or abs(lon - (-101.179)) > 0.03:
+        lat, lon = 20.1355, -101.1845
     frame = Frame(
         flags=0,
         kind=max(0, min(4, kind)),

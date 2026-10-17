@@ -298,7 +298,8 @@ form.addEventListener("submit", async (event) => {
     });
     if (!response.ok) throw new Error(String(response.status));
     setStatus("Reporte recibido por el nodo LoRa. Permanece en un lugar seguro.", "ok");
-    send.textContent = "Reporte enviado";
+    send.textContent = "Enviar otro reporte";
+    setTimeout(() => { send.disabled = false; }, 1200);
   } catch (error) {
     setStatus("No se pudo enviar el reporte. Toca el botón para reintentar.", "err");
     send.disabled = false;
