@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleDisplayName</key>
+	<string>STG-AA Brigadista</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>stg_aa_mobile</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Se requiere Bluetooth Low Energy para enlazar la terminal móvil con el nodo portátil LoRa del brigadista.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Se requiere Bluetooth para enviar dictámenes SCI y recibir órdenes del Puesto de Comando.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Se requiere su ubicación GPS para georreferenciar el triaje START, recursos SCI-211 y bloqueos viales.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Se utiliza el micrófono para el dictado por voz offline con manos ocupadas o guantes.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Reconocimiento de voz offline para captura rápida de reportes tácticos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Se utiliza la cámara para escanear el código QR de transferencia de mando SCI (CU-G05).</string>
+</dict>
+</plist>
