@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 import 'binary_frame.dart';
 
@@ -36,7 +38,7 @@ class BrigadistaHomeScreen extends StatefulWidget {
 class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
   int _tabIndex = 0;
   int _seq = 1;
-  String _statusBanner = 'ENLACE BLE ACTIVO · NODO #901 · 915 MHz';
+  String _statusBanner = 'ENLACE BLE ACTIVO · NODO #901 · MAPA OFFLINE CARGADO';
 
   // Tab 1: Triaje START (SCI-207) y Gravedad (SCI-201)
   String _selectedZone = '20.1355,-101.1845,Zona 02 · Sector Sur';
@@ -45,8 +47,11 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
   double _severity = 9;
   final Set<String> _hazards = {'Riesgo de colapso'};
 
-  // Tab 2: Bloqueos Viales
-  String _streetPreset = 'Av. Hidalgo Norte,20.1432,-101.1772';
+  // Tab 2: Mapa Dinámico de Bloqueos Viales y Rutas
+  LatLng _selectedBlockPoint = const LatLng(20.1385, -101.1818);
+  final List<LatLng> _confirmedBlockPoints = [const LatLng(20.1385, -101.1818)];
+  final TextEditingController _streetRefCtrl =
+      TextEditingController(text: 'Cruce Av. Morelos / Zona Centro');
   String _blockCause = 'Escombros / Derrumbe';
   String _blockClosure = 'Cierre total';
   final List<String> _reportedBlocks = [];
@@ -56,7 +61,7 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
   String _resType = 'Fuerza de Tarea USAR / BREC';
   String _resStatus = 'Solicitado urgente en escena';
   final TextEditingController _resNotesCtrl =
-      TextEditingController(text: 'Se requiere equipo hidráulico de corte');
+      TextEditingController(text: 'Equipo hidráulico de extracción');
   final List<String> _reportedResources = [];
 
   Future<void> _sendTriageAndSeverity() async {
@@ -90,7 +95,7 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'zone': zoneName,
-            'resource': 'Alerta de Peligro SCI-201 (Sev ${_severity.round()}/10)',
+            'resource': 'Alerta SCI-201 (Sev ${_severity.round()}/10)',
             'unit_status': 'Perímetro activo',
             'notes': _hazards.join(', '),
           }),
@@ -103,17 +108,19 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
   }
 
   Future<void> _sendRoadblock() async {
-    final parts = _streetPreset.split(',');
-    final street = parts[0];
-    final lat = double.parse(parts[1]);
-    final lon = double.parse(parts[2]);
+    final lat = _selectedBlockPoint.latitude;
+    final lon = _selectedBlockPoint.longitude;
+    final refText = _streetRefCtrl.text.trim();
+    final streetLabel = refText.isNotEmpty
+        ? '$refText (${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)})'
+        : 'Tramo (${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)})';
 
     try {
       await http.post(
         Uri.parse('$kApiBase/field/roadblock'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'street': street,
+          'street': streetLabel,
           'cause': _blockCause,
           'closure': _blockClosure,
           'lat': lat,
@@ -121,11 +128,12 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
         }),
       );
       setState(() {
-        _reportedBlocks.insert(0, '$street · $_blockCause ($_blockClosure)');
-        _statusBanner = 'BLOQUEO VIAL SINCRONIZADO EN MAPA DEL PC: $street';
+        _confirmedBlockPoints.add(_selectedBlockPoint);
+        _reportedBlocks.insert(0, '$streetLabel · $_blockCause ($_blockClosure)');
+        _statusBanner = 'BLOQUEO VIAL SINCRONIZADO EN MAPA DEL PC';
       });
     } catch (_) {
-      setState(() => _statusBanner = 'Error al enviar bloqueo vial.');
+      setState(() => _statusBanner = 'Error al transmitir bloqueo vial.');
     }
   }
 
@@ -309,30 +317,110 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('REPORTE DE VIALIDADES CERRADAS O COLAPSADAS',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black54)),
+        const Text(
+          '1. TOCA CUALQUIER CALLE EN EL MAPA DESCARGADO PARA MARCAR EL BLOQUEO',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black54),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 260,
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFD4D4CE), width: 1.5),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: const LatLng(20.1410, -101.1790),
+              initialZoom: 14.5,
+              onTap: (tapPos, latlng) {
+                setState(() {
+                  _selectedBlockPoint = latlng;
+                  _streetRefCtrl.text =
+                      'Vía bloqueada (${latlng.latitude.toStringAsFixed(4)}, ${latlng.longitude.toStringAsFixed(4)})';
+                });
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'mx.edu.itsur.stgaa',
+              ),
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: const LatLng(20.1410, -101.1790),
+                    radius: 45,
+                    useRadiusInMeter: true,
+                    color: const Color(0x33B91C1C),
+                    borderColor: const Color(0xFFB91C1C),
+                    borderStrokeWidth: 2,
+                  ),
+                  CircleMarker(
+                    point: const LatLng(20.1355, -101.1845),
+                    radius: 45,
+                    useRadiusInMeter: true,
+                    color: const Color(0x33B45309),
+                    borderColor: const Color(0xFFB45309),
+                    borderStrokeWidth: 2,
+                  ),
+                ],
+              ),
+              MarkerLayer(
+                markers: [
+                  ..._confirmedBlockPoints.map(
+                    (pt) => Marker(
+                      point: pt,
+                      width: 28,
+                      height: 28,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: const Icon(Icons.block, color: Colors.redAccent, size: 16),
+                      ),
+                    ),
+                  ),
+                  Marker(
+                    point: _selectedBlockPoint,
+                    width: 38,
+                    height: 38,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB91C1C),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2.5),
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Coordenada seleccionada: ${_selectedBlockPoint.latitude.toStringAsFixed(5)}, ${_selectedBlockPoint.longitude.toStringAsFixed(5)}',
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black87),
+        ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          value: _streetPreset,
+        TextField(
+          controller: _streetRefCtrl,
           decoration: const InputDecoration(
-            labelText: '1. Vialidad o cruce afectado',
+            labelText: '2. Referencia del tramo o calle (Opcional)',
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(),
           ),
-          items: const [
-            DropdownMenuItem(value: 'Av. Hidalgo Norte,20.1432,-101.1772', child: Text('Av. Hidalgo Norte (Acceso Centro)')),
-            DropdownMenuItem(value: 'Puente Río Moroleón,20.1372,-101.1830', child: Text('Puente Río Moroleón (Ruta Sur)')),
-            DropdownMenuItem(value: 'Blvd. Leovino Zavala,20.1455,-101.1735', child: Text('Blvd. Leovino Zavala (Ruta Oriente)')),
-            DropdownMenuItem(value: 'Calle 16 de Septiembre,20.1398,-101.1804', child: Text('Calle 16 de Septiembre')),
-          ],
-          onChanged: (v) => setState(() => _streetPreset = v!),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           value: _blockCause,
           decoration: const InputDecoration(
-            labelText: '2. Causa de la obstrucción',
+            labelText: '3. Causa de la obstrucción',
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(),
@@ -349,13 +437,13 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
         DropdownButtonFormField<String>(
           value: _blockClosure,
           decoration: const InputDecoration(
-            labelText: '3. Nivel de bloqueo',
+            labelText: '4. Nivel de cierre vial',
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(),
           ),
           items: const [
-            DropdownMenuItem(value: 'Cierre total', child: Text('Cierre total (Rutas de ambulancia bloqueadas)')),
+            DropdownMenuItem(value: 'Cierre total', child: Text('Cierre total (Ruta intransitable)')),
             DropdownMenuItem(value: 'Solo unidades ligeras', child: Text('Paso restringido solo a unidades ligeras')),
           ],
           onChanged: (v) => setState(() => _blockClosure = v!),
@@ -366,12 +454,12 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
           child: FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB91C1C)),
             onPressed: _sendRoadblock,
-            child: const Text('Marcar bloqueo vial en mapa del Puesto de Comando'),
+            child: const Text('Transmitir bloqueo vial al Puesto de Comando'),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         if (_reportedBlocks.isNotEmpty) ...[
-          const Text('Bloqueos reportados en esta sesión:',
+          const Text('Bloqueos sincronizados con el PC:',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           ..._reportedBlocks.map((b) => Card(
@@ -379,7 +467,7 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
                 elevation: 0,
                 child: ListTile(
                   dense: true,
-                  title: Text(b, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  title: Text(b, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 ),
               )),
         ],
@@ -532,8 +620,8 @@ class _BrigadistaHomeScreenState extends State<BrigadistaHomeScreen> {
             label: 'Triaje y Gravedad',
           ),
           NavigationDestination(
-            icon: Icon(Icons.block),
-            label: 'Bloqueos Viales',
+            icon: Icon(Icons.map_outlined),
+            label: 'Mapa y Bloqueos',
           ),
           NavigationDestination(
             icon: Icon(Icons.inventory_2_outlined),
