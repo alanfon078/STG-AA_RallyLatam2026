@@ -48,10 +48,10 @@ class _BrigadistaScreenState extends State<BrigadistaScreen> {
   List<dynamic> _roadblocks = [];
   Timer? _pollTimer;
 
-  // Campos de Modo Incidente (Triaje START + Gravedad + Recurso SCI-211)
+  // Campos de Modo Incidente (Triaje START + Gravedad + Recursos SCI-211)
   int _kind = 0, _rojo = 2, _amarillo = 1, _verde = 1, _negro = 0;
   double _severity = 8;
-  String _resource = 'Fuerza de Tarea USAR / BREC';
+  final Set<String> _resources = {'Fuerza de Tarea USAR / BREC', 'Ambulancia Soporte Vital (Tipo I)'};
 
   // Campos de Modo Bloqueo Vial
   final _streetCtrl = TextEditingController(text: 'Tramo vial obstruido');
@@ -118,10 +118,10 @@ class _BrigadistaScreenState extends State<BrigadistaScreen> {
       );
       final hex = frame.encodeHex();
       await _postJson('/ingest/frame', {'hex': hex});
-      if (_resource != 'Ninguno') {
+      if (_resources.isNotEmpty) {
         await _postJson('/field/resource', {
           'zone': 'Ubicación ($coordText)',
-          'resource': _resource,
+          'resource': _resources.join(' + '),
           'unit_status': 'Solicitado en sitio (Sev ${_severity.round()}/10)',
           'notes': 'Triaje START: R:$_rojo A:$_amarillo V:$_verde N:$_negro',
         });
@@ -221,12 +221,34 @@ class _BrigadistaScreenState extends State<BrigadistaScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        _select('4. Solicitar recurso táctico (SCI-211)', _resource, const {
-          'Fuerza de Tarea USAR / BREC': 'Fuerza de Tarea USAR / BREC',
-          'Ambulancia Soporte Vital (Tipo I)': 'Ambulancia Soporte Vital (Tipo I)',
-          'Camión Motobomba Extinción': 'Camión Motobomba de Extinción',
-          'Ninguno': 'Sin solicitud adicional',
-        }, (v) => setState(() => _resource = v)),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('4. Solicitar recursos tácticos (SCI-211 · Selección múltiple)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  'Fuerza de Tarea USAR / BREC',
+                  'Ambulancia Soporte Vital (Tipo I)',
+                  'Camión Motobomba Extinción',
+                  'Maquinaria Pesada',
+                ].map((r) {
+                  return FilterChip(
+                    label: Text(r, style: const TextStyle(fontSize: 12)),
+                    selected: _resources.contains(r),
+                    onSelected: (s) => setState(() => s ? _resources.add(r) : _resources.remove(r)),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
