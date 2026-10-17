@@ -43,6 +43,7 @@ class _BrigadistaScreenState extends State<BrigadistaScreen> {
   String _status = 'Toca cualquier ubicación en el mapa para reportar incidente o bloqueo.';
 
   // Datos sincronizados del mapa (clústeres y bloqueos actuales)
+  final _mapCtrl = MapController();
   List<dynamic> _clusters = [];
   List<dynamic> _roadblocks = [];
   Timer? _pollTimer;
@@ -260,49 +261,79 @@ class _BrigadistaScreenState extends State<BrigadistaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mapWidget = FlutterMap(
-      options: MapOptions(
-        initialCenter: const LatLng(20.1410, -101.1790),
-        initialZoom: 14.5,
-        onTap: (_, pt) => setState(() => _point = pt),
-      ),
+    final mapWidget = Stack(
       children: [
-        TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
-        CircleLayer(
-          circles: _clusters.map((c) {
-            final verified = c['verified'] == true;
-            final color = verified ? const Color(0xFFB91C1C) : const Color(0xFFB45309);
-            return CircleMarker(
-              point: LatLng((c['lat'] as num).toDouble(), (c['lon'] as num).toDouble()),
-              radius: 80,
-              useRadiusInMeter: true,
-              color: color.withValues(alpha: 0.22),
-              borderColor: color,
-              borderStrokeWidth: 2,
-            );
-          }).toList(),
-        ),
-        MarkerLayer(
-          markers: [
-            ..._roadblocks.map((rb) => Marker(
-                  point: LatLng((rb['lat'] as num).toDouble(), (rb['lon'] as num).toDouble()),
-                  width: 24,
-                  height: 24,
-                  child: const Center(
-                    child: Text('✕', style: TextStyle(color: Color(0xFFD90429), fontSize: 20, fontWeight: FontWeight.w900)),
+        FlutterMap(
+          mapController: _mapCtrl,
+          options: MapOptions(
+            initialCenter: const LatLng(20.1410, -101.1790),
+            initialZoom: 14.5,
+            minZoom: 11,
+            maxZoom: 19,
+            onTap: (_, pt) => setState(() => _point = pt),
+          ),
+          children: [
+            TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+            CircleLayer(
+              circles: _clusters.map((c) {
+                final verified = c['verified'] == true;
+                final color = verified ? const Color(0xFFB91C1C) : const Color(0xFFB45309);
+                return CircleMarker(
+                  point: LatLng((c['lat'] as num).toDouble(), (c['lon'] as num).toDouble()),
+                  radius: 80,
+                  useRadiusInMeter: true,
+                  color: color.withValues(alpha: 0.22),
+                  borderColor: color,
+                  borderStrokeWidth: 2,
+                );
+              }).toList(),
+            ),
+            MarkerLayer(
+              markers: [
+                ..._roadblocks.map((rb) => Marker(
+                      point: LatLng((rb['lat'] as num).toDouble(), (rb['lon'] as num).toDouble()),
+                      width: 24,
+                      height: 24,
+                      child: const Center(
+                        child: Text('✕', style: TextStyle(color: Color(0xFFD90429), fontSize: 20, fontWeight: FontWeight.w900)),
+                      ),
+                    )),
+                Marker(
+                  point: _point,
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    Icons.location_on,
+                    color: _isRoadblock ? const Color(0xFFD90429) : const Color(0xFF111111),
+                    size: 38,
                   ),
-                )),
-            Marker(
-              point: _point,
-              width: 40,
-              height: 40,
-              child: Icon(
-                Icons.location_on,
-                color: _isRoadblock ? const Color(0xFFD90429) : const Color(0xFF111111),
-                size: 38,
-              ),
+                ),
+              ],
             ),
           ],
+        ),
+        Positioned(
+          top: 12,
+          left: 12,
+          child: Column(
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'z_in',
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                onPressed: () => _mapCtrl.move(_mapCtrl.camera.center, _mapCtrl.camera.zoom + 1),
+                child: const Icon(Icons.add),
+              ),
+              const SizedBox(height: 6),
+              FloatingActionButton.small(
+                heroTag: 'z_out',
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                onPressed: () => _mapCtrl.move(_mapCtrl.camera.center, _mapCtrl.camera.zoom - 1),
+                child: const Icon(Icons.remove),
+              ),
+            ],
+          ),
         ),
       ],
     );
